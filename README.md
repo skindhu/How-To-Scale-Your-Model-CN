@@ -4,7 +4,7 @@
 
 ## 📖 关于原书《How to Scale Your Model》
 
-《如何扩展你的模型》是由Google DeepMind团队编写的技术电子书，专门讲解大语言模型的系统级优化。这本书解决了当今AI研究和工程中的核心问题：
+[《How to Scale Your Model》](https://jax-ml.github.io/scaling-book/)是由Google DeepMind团队编写的技术电子书，专门讲解大语言模型的系统级优化。这本书解决了当今AI研究和工程中的核心问题：
 
 ### 为什么这本书如此重要？
 
@@ -163,3 +163,15 @@ python main.py
 **🌟 如果这个项目对你有帮助，请给个Star支持！**
 
 **译者：北极的树** | **原书：Google DeepMind团队**
+
+## 📱 关注作者
+
+### 微信公众号
+扫码关注作者的微信公众号，获取更多AI技术分享：
+
+<img src="https://wechat-account-1251781786.cos.ap-guangzhou.myqcloud.com/wechat_account.jpeg" width="200" alt="微信公众号二维码">
+
+### 其他项目
+🔗 **也可以关注作者的另一个项目**：[《从零构建大语言模型》中文版](https://github.com/skindhu/Build-A-Large-Language-Model-CN)
+
+一个从零开始构建大语言模型的完整教程，涵盖模型架构、训练技巧和实战案例。
