@@ -21,6 +21,11 @@
 4. **并行化策略**：训练和推理的不同并行方案
 5. **实战案例**：LLaMA-3在TPU上的训练和部署
 
+## 📚 在线阅读
+
+**在线阅读**：[《如何扩展你的模型》](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/scaling-book.html)
+
+
 ## 🚀 翻译难点：突破长文档翻译瓶颈
 
 ### 挑战：超长技术文档的翻译难题
