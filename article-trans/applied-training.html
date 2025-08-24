@@ -1,0 +1,2183 @@
+<!DOCTYPE html>
+
+<html class="transition" data-theme="light" data-theme-setting="system" lang="zh-CN">
+<head><link href="https://giscus.app/default.css" id="giscus-css" rel="stylesheet"/><style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:20px;margin:11px auto 0;width:20px}#back-to-top.hidden{bottom:-56px;opacity:0}</style> <meta content="text/html; charset=utf-8" http-equiv="Content-Type"/> <meta charset="utf-8"/> <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport"/> <meta content="IE=edge" http-equiv="X-UA-Compatible"/> <title>在 TPU 上训练 LLaMA 3 | 如何扩展您的模型</title> <meta content=" " name="author"/> <meta content="让我们运用在上一节中学到的知识，仔细研究如何在 TPU v5p 上训练 LLaMA 3 模型。这些模型有多大？不同配置下的训练成本如何？它们是如何进行分片的？让我们通过一些粗略估算，来探讨前几节的内容如何映射到真实模型上。" name="description"/> <meta content="scaling, jax, llms, transformers, tpus, google, deepmind, parallelism, pallas" name="keywords"/> <link href="https://jax-ml.github.io/scaling-book/assets/css/bootstrap.min.css?a4b3f509e79c54a512b890d73235ef04" rel="stylesheet"/> <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/css/mdb.min.css" integrity="sha256-jpjYvU3G3N6nrrBwXJoVEYI/0zw8htfFnhT9ljN3JJw=" rel="stylesheet"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/academicons.min.css?f0b7046b84e425c55f3463ac249818f5" rel="stylesheet"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/scholar-icons.css?62b2ac103a88034e6882a5be5f3e2772" rel="stylesheet"/> <link defer="" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Roboto+Slab:100,300,400,500,700|Material+Icons&amp;display=swap" rel="stylesheet" type="text/css"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/jekyll-pygments-themes-vs.css?4ee1a2facd1a8a76347f4bd43a740500" id="highlight_theme_light" media="" rel="stylesheet"/> <link href="https://jax-ml.github.io/scaling-book/assets/img/favicon.png?fddbd8c2ec231ba2060e67c85de32a55" rel="shortcut icon"/> <link href="https://jax-ml.github.io/scaling-book/assets/css/main.css?d41d8cd98f00b204e9800998ecf8427e" rel="stylesheet"/> <link href="applied-training.html" rel="canonical"/> <style id="distill-prerendered-styles" type="text/css">/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+html {
+  font-size: 14px;
+	line-height: 1.6em;
+  /* font-family: "Libre Franklin", "Helvetica Neue", sans-serif; */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
+  /*, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";*/
+  text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media(min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: #004276;
+}
+
+figure {
+  margin: 0;
+}
+
+table {
+	border-collapse: collapse;
+	border-spacing: 0;
+}
+
+table th {
+	text-align: left;
+}
+
+table thead {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+table thead th {
+  padding-bottom: 0.5em;
+}
+
+table tbody :first-child td {
+  padding-top: 0.5em;
+}
+
+pre {
+  overflow: auto;
+  max-width: 100%;
+}
+
+p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+sup, sub {
+  vertical-align: baseline;
+  position: relative;
+  top: -0.4em;
+  line-height: 1em;
+}
+
+sub {
+  top: 0.4em;
+}
+
+.kicker,
+.marker {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+
+/* Headline */
+
+@media(min-width: 1024px) {
+  d-title h1 span {
+    display: block;
+  }
+}
+
+/* Figure */
+
+figure {
+  position: relative;
+  margin-bottom: 2.5em;
+  margin-top: 1.5em;
+}
+
+figcaption+figure {
+
+}
+
+figure img {
+  width: 100%;
+}
+
+figure svg text,
+figure svg tspan {
+}
+
+figcaption,
+.figcaption {
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 12px;
+  line-height: 1.5em;
+}
+
+@media(min-width: 1024px) {
+figcaption,
+.figcaption {
+    font-size: 13px;
+  }
+}
+
+figure.external img {
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.1);
+  padding: 18px;
+  box-sizing: border-box;
+}
+
+figcaption a {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+figcaption b,
+figcaption strong, {
+  font-weight: 600;
+  color: rgba(0, 0, 0, 1.0);
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@supports not (display: grid) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    display: block;
+    padding: 8px;
+  }
+}
+
+.base-grid,
+distill-header,
+d-title,
+d-abstract,
+d-article,
+d-appendix,
+distill-appendix,
+d-byline,
+d-footnote-list,
+d-citation-list,
+distill-footer {
+  display: grid;
+  justify-items: stretch;
+  grid-template-columns: [screen-start] 8px [page-start kicker-start text-start gutter-start middle-start] 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr [text-end page-end gutter-end kicker-end middle-end] 8px [screen-end];
+  grid-column-gap: 8px;
+}
+
+.grid {
+  display: grid;
+  grid-column-gap: 8px;
+}
+
+@media(min-width: 768px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start middle-start text-start] 45px 45px 45px 45px 45px 45px 45px 45px [ kicker-end text-end gutter-start] 45px [middle-end] 45px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 16px;
+  }
+
+  .grid {
+    grid-column-gap: 16px;
+  }
+}
+
+@media(min-width: 1000px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start] 50px [middle-start] 50px [text-start kicker-end] 50px 50px 50px 50px 50px 50px 50px 50px [text-end gutter-start] 50px [middle-end] 50px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 16px;
+  }
+
+  .grid {
+    grid-column-gap: 16px;
+  }
+}
+
+@media(min-width: 1180px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start] 60px [middle-start] 60px [text-start kicker-end] 60px 60px 60px 60px 60px 60px 60px 60px [text-end gutter-start] 60px [middle-end] 60px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 32px;
+  }
+
+  .grid {
+    grid-column-gap: 32px;
+  }
+}
+
+
+
+
+.base-grid {
+  grid-column: screen;
+}
+
+/* .l-body,
+d-article > *  {
+  grid-column: text;
+}
+
+.l-page,
+d-title > *,
+d-figure {
+  grid-column: page;
+} */
+
+.l-gutter {
+  grid-column: gutter;
+}
+
+.l-text,
+.l-body {
+  grid-column: text;
+}
+
+.l-page {
+  grid-column: page;
+}
+
+.l-body-outset {
+  grid-column: middle;
+}
+
+.l-page-outset {
+  grid-column: page;
+}
+
+.l-screen {
+  grid-column: screen;
+}
+
+.l-screen-inset {
+  grid-column: screen;
+  padding-left: 16px;
+  padding-left: 16px;
+}
+
+
+/* Aside */
+
+d-article aside {
+  grid-column: gutter;
+  font-size: 12px;
+  line-height: 1.6em;
+  color: rgba(0, 0, 0, 0.6)
+}
+
+@media(min-width: 768px) {
+  aside {
+    grid-column: gutter;
+  }
+
+  .side {
+    grid-column: gutter;
+  }
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-title {
+  padding: 2rem 0 1.5rem;
+  contain: layout style;
+  overflow-x: hidden;
+}
+
+@media(min-width: 768px) {
+  d-title {
+    padding: 4rem 0 1.5rem;
+  }
+}
+
+d-title h1 {
+  grid-column: text;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.1em;
+  margin: 0 0 0.5rem;
+}
+
+@media(min-width: 768px) {
+  d-title h1 {
+    font-size: 50px;
+  }
+}
+
+d-title p {
+  font-weight: 300;
+  font-size: 1.2rem;
+  line-height: 1.55em;
+  grid-column: text;
+}
+
+d-title .status {
+  margin-top: 0px;
+  font-size: 12px;
+  color: #009688;
+  opacity: 0.8;
+  grid-column: kicker;
+}
+
+d-title .status span {
+  line-height: 1;
+  display: inline-block;
+  padding: 6px 0;
+  border-bottom: 1px solid #80cbc4;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-byline {
+  contain: style;
+  overflow: hidden;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  font-size: 0.8rem;
+  line-height: 1.8em;
+  padding: 1.5rem 0;
+  min-height: 1.8em;
+}
+
+
+d-byline .byline {
+  grid-template-columns: 1fr 1fr;
+  grid-column: text;
+}
+
+@media(min-width: 768px) {
+  d-byline .byline {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+  }
+}
+
+d-byline .authors-affiliations {
+  grid-column-end: span 3;
+  grid-template-columns: 1fr 1fr 1fr;
+  margin-bottom: 1em;
+}
+
+@media(min-width: 768px) {
+  d-byline .authors-affiliations {
+    margin-bottom: 0;
+  }
+}
+
+d-byline h3 {
+  font-size: 0.6rem;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.5);
+  margin: 0;
+  text-transform: uppercase;
+}
+
+d-byline p {
+  margin: 0;
+}
+
+d-byline a,
+d-article d-byline a {
+  color: rgba(0, 0, 0, 0.8);
+  text-decoration: none;
+  border-bottom: none;
+}
+
+d-article d-byline a:hover {
+  text-decoration: underline;
+  border-bottom: none;
+}
+
+d-byline p.author {
+  font-weight: 500;
+}
+
+d-byline .affiliations {
+
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-article {
+  contain: layout style;
+ border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding-top: 2rem;
+  color: rgba(0, 0, 0, 0.8);
+}
+
+d-article > * {
+  grid-column: text;
+}
+
+@media(min-width: 768px) {
+  d-article {
+    font-size: 16px;
+  }
+}
+
+@media(min-width: 1024px) {
+  d-article {
+    font-size: 1.06rem;
+    line-height: 1.7em;
+  }
+}
+
+
+/* H2 */
+
+
+d-article .marker {
+  text-decoration: none;
+  border: none;
+  counter-reset: section;
+  grid-column: kicker;
+  line-height: 1.7em;
+}
+
+d-article .marker:hover {
+  border: none;
+}
+
+d-article .marker span {
+  padding: 0 3px 4px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  position: relative;
+  top: 4px;
+}
+
+d-article .marker:hover span {
+  color: rgba(0, 0, 0, 0.7);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.7);
+}
+
+d-article h2 {
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 1.25em;
+  margin: 2rem 0 1.5rem 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  padding-bottom: 1rem;
+}
+
+@media(min-width: 1024px) {
+  d-article h2 {
+    font-size: 36px;
+  }
+}
+
+/* H3 */
+
+d-article h3 {
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.4em;
+  margin-bottom: 1em;
+  margin-top: 2em;
+}
+
+@media(min-width: 1024px) {
+  d-article h3 {
+    font-size: 20px;
+  }
+}
+
+/* H4 */
+
+d-article h4 {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 14px;
+  line-height: 1.4em;
+}
+
+d-article a {
+  color: inherit;
+}
+
+d-article p,
+d-article ul,
+d-article ol,
+d-article blockquote {
+  margin-top: 0;
+  margin-bottom: 1em;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+d-article blockquote {
+  border-left: 2px solid rgba(0, 0, 0, 0.2);
+  padding-left: 2em;
+  font-style: italic;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+d-article a {
+  border-bottom: 1px solid var(--global-underline-color);
+  text-decoration: none;
+}
+
+d-article a:hover {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.8);
+}
+
+d-article .link {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+d-article ul,
+d-article ol {
+  padding-left: 24px;
+}
+
+d-article li {
+  margin-bottom: 1em;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+d-article li:last-child {
+  margin-bottom: 0;
+}
+
+d-article pre {
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+d-article hr {
+  grid-column: screen;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  margin-top: 60px;
+  margin-bottom: 60px;
+}
+
+d-article section {
+  margin-top: 60px;
+  margin-bottom: 60px;
+}
+
+d-article span.equation-mimic {
+  font-family: georgia;
+  font-size: 115%;
+  font-style: italic;
+}
+
+d-article > d-code,
+d-article section > d-code  {
+  display: block;
+}
+
+d-article > d-math[block],
+d-article section > d-math[block]  {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  d-article > d-code,
+  d-article section > d-code,
+  d-article > d-math[block],
+  d-article section > d-math[block] {
+      overflow-x: scroll;
+      -ms-overflow-style: none;  // IE 10+
+      overflow: -moz-scrollbars-none;  // Firefox
+  }
+
+  d-article > d-code::-webkit-scrollbar,
+  d-article section > d-code::-webkit-scrollbar,
+  d-article > d-math[block]::-webkit-scrollbar,
+  d-article section > d-math[block]::-webkit-scrollbar {
+    display: none;  // Safari and Chrome
+  }
+}
+
+d-article .citation {
+  color: #668;
+  cursor: pointer;
+}
+
+d-include {
+  width: auto;
+  display: block;
+}
+
+d-figure {
+  contain: layout style;
+}
+
+/* KaTeX */
+
+.katex, .katex-prerendered {
+  contain: style;
+  display: inline-block;
+}
+
+/* Tables */
+
+d-article table {
+  border-collapse: collapse;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+d-article table th {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+d-article table td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+d-article table tr:last-of-type td {
+  border-bottom: none;
+}
+
+d-article table th,
+d-article table td {
+  font-size: 15px;
+  padding: 2px 8px;
+}
+
+d-article table tbody :first-child td {
+  padding-top: 2px;
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+span.katex-display {
+  text-align: left;
+  padding: 8px 0 8px 0;
+  margin: 0.5em 0 0.5em 1em;
+}
+
+span.katex {
+  -webkit-font-smoothing: antialiased;
+;
+  font-size: 1.18em;
+}
+
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@media print {
+
+  @page {
+    size: 8in 11in;
+    @bottom-right {
+      content: counter(page) " of " counter(pages);
+    }
+  }
+
+  html {
+    /* no general margins -- CSS Grid takes care of those */
+  }
+
+  p, code {
+    page-break-inside: avoid;
+  }
+
+  h2, h3 {
+    page-break-after: avoid;
+  }
+
+  d-header {
+    visibility: hidden;
+  }
+
+  d-footer {
+    display: none!important;
+  }
+
+}
+</style><script src="https://jax-ml.github.io/scaling-book/assets/js/theme.js?9a0c749ec5240d9cda97bc72359a72c0"></script> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/jekyll-pygments-themes-native.css?5847e5ed4a4568527aa6cfab446049ca" id="highlight_theme_dark" media="none" rel="stylesheet"/> <script>
+    initTheme();
+  </script> <script src="https://jax-ml.github.io/scaling-book/assets/js/distillpub/template.v2.js"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/distillpub/transforms.v2.js"></script> <style type="text/css">{{page._styles}}</style> <style type="text/css">/* Chart.js */
+@-webkit-keyframes chartjs-render-animation{from{opacity:0.99}to{opacity:1}}@keyframes chartjs-render-animation{from{opacity:0.99}to{opacity:1}}.chartjs-render-monitor{-webkit-animation:chartjs-render-animation 0.001s;animation:chartjs-render-animation 0.001s;}</style><style type="text/css">.medium-zoom-overlay{position:fixed;top:0;right:0;bottom:0;left:0;opacity:0;transition:opacity .3s;will-change:opacity}.medium-zoom--opened .medium-zoom-overlay{cursor:pointer;cursor:zoom-out;opacity:1}.medium-zoom-image{cursor:pointer;cursor:zoom-in;transition:transform .3s cubic-bezier(.2,0,.2,1)!important}.medium-zoom-image--hidden{visibility:hidden}.medium-zoom-image--opened{position:relative;cursor:pointer;cursor:zoom-out;will-change:transform}</style><style type="text/css">.CtxtMenu_InfoClose {  top:.2em; right:.2em;}
+.CtxtMenu_InfoContent {  overflow:auto; text-align:left; font-size:80%;  padding:.4em .6em; border:1px inset; margin:1em 0px;  max-height:20em; max-width:30em; background-color:#EEEEEE;  white-space:normal;}
+.CtxtMenu_Info.CtxtMenu_MousePost {outline:none;}
+.CtxtMenu_Info {  position:fixed; left:50%; width:auto; text-align:center;  border:3px outset; padding:1em 2em; background-color:#DDDDDD;  color:black;  cursor:default; font-family:message-box; font-size:120%;  font-style:normal; text-indent:0; text-transform:none;  line-height:normal; letter-spacing:normal; word-spacing:normal;  word-wrap:normal; white-space:nowrap; float:none; z-index:201;  border-radius: 15px;                     /* Opera 10.5 and IE9 */  -webkit-border-radius:15px;               /* Safari and Chrome */  -moz-border-radius:15px;                  /* Firefox */  -khtml-border-radius:15px;                /* Konqueror */  box-shadow:0px 10px 20px #808080;         /* Opera 10.5 and IE9 */  -webkit-box-shadow:0px 10px 20px #808080; /* Safari 3 & Chrome */  -moz-box-shadow:0px 10px 20px #808080;    /* Forefox 3.5 */  -khtml-box-shadow:0px 10px 20px #808080;  /* Konqueror */  filter:progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color="gray", Positive="true"); /* IE */}
+</style><style type="text/css">.CtxtMenu_MenuClose {  position:absolute;  cursor:pointer;  display:inline-block;  border:2px solid #AAA;  border-radius:18px;  -webkit-border-radius: 18px;             /* Safari and Chrome */  -moz-border-radius: 18px;                /* Firefox */  -khtml-border-radius: 18px;              /* Konqueror */  font-family: "Courier New", Courier;  font-size:24px;  color:#F0F0F0}
+.CtxtMenu_MenuClose span {  display:block; background-color:#AAA; border:1.5px solid;  border-radius:18px;  -webkit-border-radius: 18px;             /* Safari and Chrome */  -moz-border-radius: 18px;                /* Firefox */  -khtml-border-radius: 18px;              /* Konqueror */  line-height:0;  padding:8px 0 6px     /* may need to be browser-specific */}
+.CtxtMenu_MenuClose:hover {  color:white!important;  border:2px solid #CCC!important}
+.CtxtMenu_MenuClose:hover span {  background-color:#CCC!important}
+.CtxtMenu_MenuClose:hover:focus {  outline:none}
+</style><style type="text/css">.CtxtMenu_Menu {  position:absolute;  background-color:white;  color:black;  width:auto; padding:5px 0px;  border:1px solid #CCCCCC; margin:0; cursor:default;  font: menu; text-align:left; text-indent:0; text-transform:none;  line-height:normal; letter-spacing:normal; word-spacing:normal;  word-wrap:normal; white-space:nowrap; float:none; z-index:201;  border-radius: 5px;                     /* Opera 10.5 and IE9 */  -webkit-border-radius: 5px;             /* Safari and Chrome */  -moz-border-radius: 5px;                /* Firefox */  -khtml-border-radius: 5px;              /* Konqueror */  box-shadow:0px 10px 20px #808080;         /* Opera 10.5 and IE9 */  -webkit-box-shadow:0px 10px 20px #808080; /* Safari 3 & Chrome */  -moz-box-shadow:0px 10px 20px #808080;    /* Forefox 3.5 */  -khtml-box-shadow:0px 10px 20px #808080;  /* Konqueror */}
+.CtxtMenu_MenuItem {  padding: 1px 2em;  background:transparent;}
+.CtxtMenu_MenuArrow {  position:absolute; right:.5em; padding-top:.25em; color:#666666;  font-family: null; font-size: .75em}
+.CtxtMenu_MenuActive .CtxtMenu_MenuArrow {color:white}
+.CtxtMenu_MenuArrow.CtxtMenu_RTL {left:.5em; right:auto}
+.CtxtMenu_MenuCheck {  position:absolute; left:.7em;  font-family: null}
+.CtxtMenu_MenuCheck.CtxtMenu_RTL { right:.7em; left:auto }
+.CtxtMenu_MenuRadioCheck {  position:absolute; left: .7em;}
+.CtxtMenu_MenuRadioCheck.CtxtMenu_RTL {  right: .7em; left:auto}
+.CtxtMenu_MenuInputBox {  padding-left: 1em; right:.5em; color:#666666;  font-family: null;}
+.CtxtMenu_MenuInputBox.CtxtMenu_RTL {  left: .1em;}
+.CtxtMenu_MenuComboBox {  left:.1em; padding-bottom:.5em;}
+.CtxtMenu_MenuSlider {  left: .1em;}
+.CtxtMenu_SliderValue {  position:absolute; right:.1em; padding-top:.25em; color:#333333;  font-size: .75em}
+.CtxtMenu_SliderBar {  outline: none; background: #d3d3d3}
+.CtxtMenu_MenuLabel {  padding: 1px 2em 3px 1.33em;  font-style:italic}
+.CtxtMenu_MenuRule {  border-top: 1px solid #DDDDDD;  margin: 4px 3px;}
+.CtxtMenu_MenuDisabled {  color:GrayText}
+.CtxtMenu_MenuActive {  background-color: #606872;  color: white;}
+.CtxtMenu_MenuDisabled:focus {  background-color: #E8E8E8}
+.CtxtMenu_MenuLabel:focus {  background-color: #E8E8E8}
+.CtxtMenu_ContextMenu:focus {  outline:none}
+.CtxtMenu_ContextMenu .CtxtMenu_MenuItem:focus {  outline:none}
+.CtxtMenu_SelectionMenu {  position:relative; float:left;  border-bottom: none; -webkit-box-shadow:none; -webkit-border-radius:0px; }
+.CtxtMenu_SelectionItem {  padding-right: 1em;}
+.CtxtMenu_Selection {  right: 40%; width:50%; }
+.CtxtMenu_SelectionBox {  padding: 0em; max-height:20em; max-width: none;  background-color:#FFFFFF;}
+.CtxtMenu_SelectionDivider {  clear: both; border-top: 2px solid #000000;}
+.CtxtMenu_Menu .CtxtMenu_MenuClose {  top:-10px; left:-10px}
+</style><style id="MJX-CHTML-styles">
+mjx-container[jax="CHTML"] {
+  line-height: 0;
+}
+
+mjx-container [space="1"] {
+  margin-left: .111em;
+}
+
+mjx-container [space="2"] {
+  margin-left: .167em;
+}
+
+mjx-container [space="3"] {
+  margin-left: .222em;
+}
+
+mjx-container [space="4"] {
+  margin-left: .278em;
+}
+
+mjx-container [space="5"] {
+  margin-left: .333em;
+}
+
+mjx-container [rspace="1"] {
+  margin-right: .111em;
+}
+
+mjx-container [rspace="2"] {
+  margin-right: .167em;
+}
+
+mjx-container [rspace="3"] {
+  margin-right: .222em;
+}
+
+mjx-container [rspace="4"] {
+  margin-right: .278em;
+}
+
+mjx-container [rspace="5"] {
+  margin-right: .333em;
+}
+
+mjx-container [size="s"] {
+  font-size: 70.7%;
+}
+
+mjx-container [size="ss"] {
+  font-size: 50%;
+}
+
+mjx-container [size="Tn"] {
+  font-size: 60%;
+}
+
+mjx-container [size="sm"] {
+  font-size: 85%;
+}
+
+mjx-container [size="lg"] {
+  font-size: 120%;
+}
+
+mjx-container [size="Lg"] {
+  font-size: 144%;
+}
+
+mjx-container [size="LG"] {
+  font-size: 173%;
+}
+
+mjx-container [size="hg"] {
+  font-size: 207%;
+}
+
+mjx-container [size="HG"] {
+  font-size: 249%;
+}
+
+mjx-container [width="full"] {
+  width: 100%;
+}
+
+mjx-box {
+  display: inline-block;
+}
+
+mjx-block {
+  display: block;
+}
+
+mjx-itable {
+  display: inline-table;
+}
+
+mjx-row {
+  display: table-row;
+}
+
+mjx-row > * {
+  display: table-cell;
+}
+
+mjx-mtext {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-mstyle {
+  display: inline-block;
+}
+
+mjx-merror {
+  display: inline-block;
+  color: red;
+  background-color: yellow;
+}
+
+mjx-mphantom {
+  visibility: hidden;
+}
+
+_::-webkit-full-page-media, _:future, :root mjx-container {
+  will-change: opacity;
+}
+
+mjx-assistive-mml {
+  position: absolute !important;
+  top: 0px;
+  left: 0px;
+  clip: rect(1px, 1px, 1px, 1px);
+  padding: 1px 0px 0px 0px !important;
+  border: 0px !important;
+  display: block !important;
+  width: auto !important;
+  overflow: hidden !important;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+mjx-assistive-mml[display="block"] {
+  width: 100% !important;
+}
+
+mjx-math {
+  display: inline-block;
+  text-align: left;
+  line-height: 0;
+  text-indent: 0;
+  font-style: normal;
+  font-weight: normal;
+  font-size: 100%;
+  font-size-adjust: none;
+  letter-spacing: normal;
+  border-collapse: collapse;
+  word-wrap: normal;
+  word-spacing: normal;
+  white-space: nowrap;
+  direction: ltr;
+  padding: 1px 0;
+}
+
+mjx-container[jax="CHTML"][display="true"] {
+  display: block;
+  text-align: center;
+  margin: 1em 0;
+}
+
+mjx-container[jax="CHTML"][display="true"][width="full"] {
+  display: flex;
+}
+
+mjx-container[jax="CHTML"][display="true"] mjx-math {
+  padding: 0;
+}
+
+mjx-container[jax="CHTML"][justify="left"] {
+  text-align: left;
+}
+
+mjx-container[jax="CHTML"][justify="right"] {
+  text-align: right;
+}
+
+mjx-msub {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-mi {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-c {
+  display: inline-block;
+}
+
+mjx-utext {
+  display: inline-block;
+  padding: .75em 0 .2em 0;
+}
+
+mjx-TeXAtom {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-mn {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-mo {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-stretchy-h {
+  display: inline-table;
+  width: 100%;
+}
+
+mjx-stretchy-h > * {
+  display: table-cell;
+  width: 0;
+}
+
+mjx-stretchy-h > * > mjx-c {
+  display: inline-block;
+  transform: scalex(1.0000001);
+}
+
+mjx-stretchy-h > * > mjx-c::before {
+  display: inline-block;
+  width: initial;
+}
+
+mjx-stretchy-h > mjx-ext {
+  /* IE */ overflow: hidden;
+  /* others */ overflow: clip visible;
+  width: 100%;
+}
+
+mjx-stretchy-h > mjx-ext > mjx-c::before {
+  transform: scalex(500);
+}
+
+mjx-stretchy-h > mjx-ext > mjx-c {
+  width: 0;
+}
+
+mjx-stretchy-h > mjx-beg > mjx-c {
+  margin-right: -.1em;
+}
+
+mjx-stretchy-h > mjx-end > mjx-c {
+  margin-left: -.1em;
+}
+
+mjx-stretchy-v {
+  display: inline-block;
+}
+
+mjx-stretchy-v > * {
+  display: block;
+}
+
+mjx-stretchy-v > mjx-beg {
+  height: 0;
+}
+
+mjx-stretchy-v > mjx-end > mjx-c {
+  display: block;
+}
+
+mjx-stretchy-v > * > mjx-c {
+  transform: scaley(1.0000001);
+  transform-origin: left center;
+  overflow: hidden;
+}
+
+mjx-stretchy-v > mjx-ext {
+  display: block;
+  height: 100%;
+  box-sizing: border-box;
+  border: 0px solid transparent;
+  /* IE */ overflow: hidden;
+  /* others */ overflow: visible clip;
+}
+
+mjx-stretchy-v > mjx-ext > mjx-c::before {
+  width: initial;
+  box-sizing: border-box;
+}
+
+mjx-stretchy-v > mjx-ext > mjx-c {
+  transform: scaleY(500) translateY(.075em);
+  overflow: visible;
+}
+
+mjx-mark {
+  display: inline-block;
+  height: 0px;
+}
+
+mjx-msqrt {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-root {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+mjx-surd {
+  display: inline-block;
+  vertical-align: top;
+}
+
+mjx-sqrt {
+  display: inline-block;
+  padding-top: .07em;
+}
+
+mjx-sqrt > mjx-box {
+  border-top: .07em solid;
+}
+
+mjx-sqrt.mjx-tall > mjx-box {
+  padding-left: .3em;
+  margin-left: -.3em;
+}
+
+mjx-mfrac {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-frac {
+  display: inline-block;
+  vertical-align: 0.17em;
+  padding: 0 .22em;
+}
+
+mjx-frac[type="d"] {
+  vertical-align: .04em;
+}
+
+mjx-frac[delims] {
+  padding: 0 .1em;
+}
+
+mjx-frac[atop] {
+  padding: 0 .12em;
+}
+
+mjx-frac[atop][delims] {
+  padding: 0;
+}
+
+mjx-dtable {
+  display: inline-table;
+  width: 100%;
+}
+
+mjx-dtable > * {
+  font-size: 2000%;
+}
+
+mjx-dbox {
+  display: block;
+  font-size: 5%;
+}
+
+mjx-num {
+  display: block;
+  text-align: center;
+}
+
+mjx-den {
+  display: block;
+  text-align: center;
+}
+
+mjx-mfrac[bevelled] > mjx-num {
+  display: inline-block;
+}
+
+mjx-mfrac[bevelled] > mjx-den {
+  display: inline-block;
+}
+
+mjx-den[align="right"], mjx-num[align="right"] {
+  text-align: right;
+}
+
+mjx-den[align="left"], mjx-num[align="left"] {
+  text-align: left;
+}
+
+mjx-nstrut {
+  display: inline-block;
+  height: .054em;
+  width: 0;
+  vertical-align: -.054em;
+}
+
+mjx-nstrut[type="d"] {
+  height: .217em;
+  vertical-align: -.217em;
+}
+
+mjx-dstrut {
+  display: inline-block;
+  height: .505em;
+  width: 0;
+}
+
+mjx-dstrut[type="d"] {
+  height: .726em;
+}
+
+mjx-line {
+  display: block;
+  box-sizing: border-box;
+  min-height: 1px;
+  height: .06em;
+  border-top: .06em solid;
+  margin: .06em -.1em;
+  overflow: hidden;
+}
+
+mjx-line[type="d"] {
+  margin: .18em -.1em;
+}
+
+mjx-mrow {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-c::before {
+  display: block;
+  width: 0;
+}
+
+.MJX-TEX {
+  font-family: MJXZERO, MJXTEX;
+}
+
+.TEX-B {
+  font-family: MJXZERO, MJXTEX-B;
+}
+
+.TEX-I {
+  font-family: MJXZERO, MJXTEX-I;
+}
+
+.TEX-MI {
+  font-family: MJXZERO, MJXTEX-MI;
+}
+
+.TEX-BI {
+  font-family: MJXZERO, MJXTEX-BI;
+}
+
+.TEX-S1 {
+  font-family: MJXZERO, MJXTEX-S1;
+}
+
+.TEX-S2 {
+  font-family: MJXZERO, MJXTEX-S2;
+}
+
+.TEX-S3 {
+  font-family: MJXZERO, MJXTEX-S3;
+}
+
+.TEX-S4 {
+  font-family: MJXZERO, MJXTEX-S4;
+}
+
+.TEX-A {
+  font-family: MJXZERO, MJXTEX-A;
+}
+
+.TEX-C {
+  font-family: MJXZERO, MJXTEX-C;
+}
+
+.TEX-CB {
+  font-family: MJXZERO, MJXTEX-CB;
+}
+
+.TEX-FR {
+  font-family: MJXZERO, MJXTEX-FR;
+}
+
+.TEX-FRB {
+  font-family: MJXZERO, MJXTEX-FRB;
+}
+
+.TEX-SS {
+  font-family: MJXZERO, MJXTEX-SS;
+}
+
+.TEX-SSB {
+  font-family: MJXZERO, MJXTEX-SSB;
+}
+
+.TEX-SSI {
+  font-family: MJXZERO, MJXTEX-SSI;
+}
+
+.TEX-SC {
+  font-family: MJXZERO, MJXTEX-SC;
+}
+
+.TEX-T {
+  font-family: MJXZERO, MJXTEX-T;
+}
+
+.TEX-V {
+  font-family: MJXZERO, MJXTEX-V;
+}
+
+.TEX-VB {
+  font-family: MJXZERO, MJXTEX-VB;
+}
+
+mjx-stretchy-v mjx-c, mjx-stretchy-h mjx-c {
+  font-family: MJXZERO, MJXTEX-S1, MJXTEX-S4, MJXTEX, MJXTEX-A ! important;
+}
+
+@font-face /* 0 */ {
+  font-family: MJXZERO;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Zero.woff") format("woff");
+}
+
+@font-face /* 1 */ {
+  font-family: MJXTEX;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Main-Regular.woff") format("woff");
+}
+
+@font-face /* 2 */ {
+  font-family: MJXTEX-B;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Main-Bold.woff") format("woff");
+}
+
+@font-face /* 3 */ {
+  font-family: MJXTEX-I;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Math-Italic.woff") format("woff");
+}
+
+@font-face /* 4 */ {
+  font-family: MJXTEX-MI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Main-Italic.woff") format("woff");
+}
+
+@font-face /* 5 */ {
+  font-family: MJXTEX-BI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Math-BoldItalic.woff") format("woff");
+}
+
+@font-face /* 6 */ {
+  font-family: MJXTEX-S1;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size1-Regular.woff") format("woff");
+}
+
+@font-face /* 7 */ {
+  font-family: MJXTEX-S2;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size2-Regular.woff") format("woff");
+}
+
+@font-face /* 8 */ {
+  font-family: MJXTEX-S3;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size3-Regular.woff") format("woff");
+}
+
+@font-face /* 9 */ {
+  font-family: MJXTEX-S4;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size4-Regular.woff") format("woff");
+}
+
+@font-face /* 10 */ {
+  font-family: MJXTEX-A;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_AMS-Regular.woff") format("woff");
+}
+
+@font-face /* 11 */ {
+  font-family: MJXTEX-C;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Calligraphic-Regular.woff") format("woff");
+}
+
+@font-face /* 12 */ {
+  font-family: MJXTEX-CB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Calligraphic-Bold.woff") format("woff");
+}
+
+@font-face /* 13 */ {
+  font-family: MJXTEX-FR;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Fraktur-Regular.woff") format("woff");
+}
+
+@font-face /* 14 */ {
+  font-family: MJXTEX-FRB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Fraktur-Bold.woff") format("woff");
+}
+
+@font-face /* 15 */ {
+  font-family: MJXTEX-SS;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Regular.woff") format("woff");
+}
+
+@font-face /* 16 */ {
+  font-family: MJXTEX-SSB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Bold.woff") format("woff");
+}
+
+@font-face /* 17 */ {
+  font-family: MJXTEX-SSI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Italic.woff") format("woff");
+}
+
+@font-face /* 18 */ {
+  font-family: MJXTEX-SC;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Script-Regular.woff") format("woff");
+}
+
+@font-face /* 19 */ {
+  font-family: MJXTEX-T;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Typewriter-Regular.woff") format("woff");
+}
+
+@font-face /* 20 */ {
+  font-family: MJXTEX-V;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Vector-Regular.woff") format("woff");
+}
+
+@font-face /* 21 */ {
+  font-family: MJXTEX-VB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Vector-Bold.woff") format("woff");
+}
+
+mjx-c.mjx-c1D45B.TEX-I::before {
+  padding: 0.442em 0.6em 0.011em 0;
+  content: "n";
+}
+
+mjx-c.mjx-c6C::before {
+  padding: 0.694em 0.278em 0 0;
+  content: "l";
+}
+
+mjx-c.mjx-c61::before {
+  padding: 0.448em 0.5em 0.011em 0;
+  content: "a";
+}
+
+mjx-c.mjx-c79::before {
+  padding: 0.431em 0.528em 0.204em 0;
+  content: "y";
+}
+
+mjx-c.mjx-c65::before {
+  padding: 0.448em 0.444em 0.011em 0;
+  content: "e";
+}
+
+mjx-c.mjx-c72::before {
+  padding: 0.442em 0.392em 0 0;
+  content: "r";
+}
+
+mjx-c.mjx-c73::before {
+  padding: 0.448em 0.394em 0.011em 0;
+  content: "s";
+}
+
+mjx-c.mjx-c1D451.TEX-I::before {
+  padding: 0.694em 0.52em 0.01em 0;
+  content: "d";
+}
+
+mjx-c.mjx-c6D::before {
+  padding: 0.442em 0.833em 0 0;
+  content: "m";
+}
+
+mjx-c.mjx-c6F::before {
+  padding: 0.448em 0.5em 0.01em 0;
+  content: "o";
+}
+
+mjx-c.mjx-c64::before {
+  padding: 0.694em 0.556em 0.011em 0;
+  content: "d";
+}
+
+mjx-c.mjx-c1D453.TEX-I::before {
+  padding: 0.705em 0.55em 0.205em 0;
+  content: "f";
+}
+
+mjx-c.mjx-c68::before {
+  padding: 0.694em 0.556em 0 0;
+  content: "h";
+}
+
+mjx-c.mjx-c6B::before {
+  padding: 0.694em 0.528em 0 0;
+  content: "k";
+}
+
+mjx-c.mjx-c76::before {
+  padding: 0.431em 0.528em 0.011em 0;
+  content: "v";
+}
+
+mjx-c.mjx-c5F::before {
+  padding: 0 0.5em 0.062em 0;
+  content: "_";
+}
+
+mjx-c.mjx-c71::before {
+  padding: 0.442em 0.528em 0.194em 0;
+  content: "q";
+}
+
+mjx-c.mjx-c62::before {
+  padding: 0.694em 0.556em 0.011em 0;
+  content: "b";
+}
+
+mjx-c.mjx-c69::before {
+  padding: 0.669em 0.278em 0 0;
+  content: "i";
+}
+
+mjx-c.mjx-c6E::before {
+  padding: 0.442em 0.556em 0 0;
+  content: "n";
+}
+
+mjx-c.mjx-c67::before {
+  padding: 0.453em 0.5em 0.206em 0;
+  content: "g";
+}
+
+mjx-c.mjx-c36::before {
+  padding: 0.666em 0.5em 0.022em 0;
+  content: "6";
+}
+
+mjx-c.mjx-c22C5::before {
+  padding: 0.31em 0.278em 0 0;
+  content: "\22C5";
+}
+
+mjx-c.mjx-c70::before {
+  padding: 0.442em 0.556em 0.194em 0;
+  content: "p";
+}
+
+mjx-c.mjx-c20::before {
+  padding: 0 0.25em 0 0;
+  content: " ";
+}
+
+mjx-c.mjx-c63::before {
+  padding: 0.448em 0.444em 0.011em 0;
+  content: "c";
+}
+
+mjx-c.mjx-c75::before {
+  padding: 0.442em 0.556em 0.011em 0;
+  content: "u";
+}
+
+mjx-c.mjx-c74::before {
+  padding: 0.615em 0.389em 0.01em 0;
+  content: "t";
+}
+
+mjx-c.mjx-c7A::before {
+  padding: 0.431em 0.444em 0 0;
+  content: "z";
+}
+
+mjx-c.mjx-c3C::before {
+  padding: 0.54em 0.778em 0.04em 0;
+  content: "<";
+}
+
+mjx-c.mjx-c32::before {
+  padding: 0.666em 0.5em 0 0;
+  content: "2";
+}
+
+mjx-c.mjx-c35::before {
+  padding: 0.666em 0.5em 0.022em 0;
+  content: "5";
+}
+
+mjx-c.mjx-c30::before {
+  padding: 0.666em 0.5em 0.022em 0;
+  content: "0";
+}
+
+mjx-c.mjx-c2F::before {
+  padding: 0.75em 0.5em 0.25em 0;
+  content: "/";
+}
+
+mjx-c.mjx-c1D440.TEX-I::before {
+  padding: 0.683em 1.051em 0 0;
+  content: "M";
+}
+
+mjx-c.mjx-c1D44B.TEX-I::before {
+  padding: 0.683em 0.852em 0 0;
+  content: "X";
+}
+
+mjx-c.mjx-c1D45C.TEX-I::before {
+  padding: 0.441em 0.485em 0.011em 0;
+  content: "o";
+}
+
+mjx-c.mjx-c1D45D.TEX-I::before {
+  padding: 0.442em 0.503em 0.194em 0;
+  content: "p";
+}
+
+mjx-c.mjx-c1D461.TEX-I::before {
+  padding: 0.626em 0.361em 0.011em 0;
+  content: "t";
+}
+
+mjx-c.mjx-c3D::before {
+  padding: 0.583em 0.778em 0.082em 0;
+  content: "=";
+}
+
+mjx-c.mjx-c221A.TEX-S3::before {
+  padding: 1.45em 1.02em 0.95em 0;
+  content: "\221A";
+}
+
+mjx-c.mjx-c1D435.TEX-I::before {
+  padding: 0.683em 0.759em 0 0;
+  content: "B";
+}
+
+mjx-c.mjx-c1D441.TEX-I::before {
+  padding: 0.683em 0.888em 0 0;
+  content: "N";
+}
+
+mjx-c.mjx-c1D439.TEX-I::before {
+  padding: 0.68em 0.749em 0 0;
+  content: "F";
+}
+
+mjx-c.mjx-c34::before {
+  padding: 0.677em 0.5em 0 0;
+  content: "4";
+}
+
+mjx-c.mjx-c2E::before {
+  padding: 0.12em 0.278em 0 0;
+  content: ".";
+}
+
+mjx-c.mjx-c31::before {
+  padding: 0.666em 0.5em 0 0;
+  content: "1";
+}
+
+mjx-c.mjx-c39::before {
+  padding: 0.666em 0.5em 0.022em 0;
+  content: "9";
+}
+
+mjx-c.mjx-c1D452.TEX-I::before {
+  padding: 0.442em 0.466em 0.011em 0;
+  content: "e";
+}
+
+mjx-c.mjx-c38::before {
+  padding: 0.666em 0.5em 0.022em 0;
+  content: "8";
+}
+
+mjx-c.mjx-c37::before {
+  padding: 0.676em 0.5em 0.022em 0;
+  content: "7";
+}
+</style><link crossorigin="anonymous" href="https://distill.pub/third-party/katex/katex.min.css" rel="stylesheet"/><script async="" src="https://distill.pub/third-party/katex/katex.min.js"></script></head>
+<body> <d-front-matter> <script async="" type="text/json">
+      {
+            "title": "在 TPU 上训练 LLaMA 3",
+            "description": "让我们仔细研究一下如何利用上一节学到的知识，在 TPU v5p 上训练 LLaMA 3 模型。它们有多大？在不同配置下训练的成本有多高？它们是如何分片的？让我们通过一些粗略的估算，来探讨前面几节的内容如何应用到真实模型上。",
+            "published": "2025年2月4日",
+            "authors": [
+              
+              {
+                "author": "Jacob Austin",
+                "authorURL": "https://www.jacobaustin.org/",
+                "affiliations": [
+                  {
+                    "name": "Google DeepMind",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Sholto Douglas",
+                "authorURL": "https://x.com/_sholtodouglas",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Roy Frostig",
+                "authorURL": "https://cs.stanford.edu/~rfrostig/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Anselm Levskaya",
+                "authorURL": "https://anselmlevskaya.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Charlie Chen",
+                "authorURL": "https://x.com/charliexychen",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Sharad Vikram",
+                "authorURL": "https://sharadvikram.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Federico Lebron",
+                "authorURL": "https://fedelebron.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Peter Choy",
+                "authorURL": "https://x.com/pchoy95",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Vinay Ramasesh",
+                "authorURL": "https://x.com/vinayramasesh",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Albert Webson",
+                "authorURL": "https://representation.ai/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Reiner Pope<sup>*</sup>",
+                "authorURL": "https://x.com/reinerpope",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              }
+              
+            ],
+            "katex": {
+              "delimiters": [
+                {
+                  "left": "$",
+                  "right": "$",
+                  "display": false
+                },
+                {
+                  "left": "$$",
+                  "right": "$$",
+                  "display": true
+                }
+              ]
+            }
+          }
+    </script> </d-front-matter> <header> <script>
+    function goToTop() {
+      document.body.scrollTop = 0; // For Safari
+      document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+    }
+
+    // When the user scrolls down 20px from the top of the document, show the button
+    window.onscroll = function() {scrollFunction()};
+
+    function scrollFunction() {
+      // Get the button:
+      let mybutton = document.getElementById("top-button");
+
+      if (document.body.scrollTop > 40 || document.documentElement.scrollTop > 40) {
+        mybutton.style.display = "block";
+      } else {
+        mybutton.style.display = "none";
+      }
+  }
+  </script> <nav class="navbar navbar-light navbar-expand-sm fixed-top" id="navbar" role="navigation"> <div class="container"> <a class="navbar-brand title font-weight-lighter" href="scaling-book.html"> 如何扩展你的模型 </a> <button aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler collapsed ml-auto" data-target="#navbarNav" data-toggle="collapse" type="button"> <span class="sr-only">切换导航</span> <span class="icon-bar top-bar"></span> <span class="icon-bar middle-bar"></span> <span class="icon-bar bottom-bar"></span> </button> <div class="left-button section-button"><a href="training.html"><svg viewbox="-78.5 0 512 512"><path d="M257 64L291 98 128 262 291 426 257 460 61 262 257 64Z"></path></svg></a></div> <div class="right-button section-button"><a href="inference.html"><svg viewbox="-78.5 0 512 512"><path d="M98 460L64 426 227 262 64 98 98 64 294 262 98 460Z"></path></svg></a></div> <div class="collapse navbar-collapse text-right" id="navbarNav"> <ul class="navbar-nav ml-auto flex-nowrap"> <li class="nav-item"> <a class="nav-link" href="scaling-book.html"> </a> </li> <li class="nav-item nav-hidden"><a class="nav-link" id="top-button" onclick="goToTop()" style="display: none;">返回顶部</a></li> <li class="nav-item nav-hidden"><p class="nav-link"></p></li> <li class="nav-item nav-hidden"><a class="nav-link" href="training.html">上一部分</a></li> <li class="nav-item nav-hidden"><a class="nav-link" href="inference.html">下一部分</a></li> <li class="nav-item nav-hidden"><p class="nav-link"></p></li> <li class="nav-item dropdown"> <a aria-expanded="false" aria-haspopup="true" class="nav-link dropdown-toggle" data-toggle="dropdown" href="#" id="navbarDropdown" role="button">章节 </a> <div aria-labelledby="navbarDropdown" class="dropdown-menu dropdown-menu-right"> <a class="dropdown-item" href="https://jax-ml.github.io/scaling-book/index">第0部分. 引言</a> <a class="dropdown-item" href="roofline.html">第1部分. 屋顶线模型简介</a> <a class="dropdown-item" href="tpus.html">第2部分. 全面了解 TPU</a> <a class="dropdown-item" href="sharding.html">第3部分. 分片矩阵乘法</a> <a class="dropdown-item" href="transformers.html">第4部分. Transformer</a> <a class="dropdown-item" href="training.html">第5部分. 训练</a> <a class="dropdown-item" href="applied-training.html">第6部分. 训练 LLaMA</a> <a class="dropdown-item" href="inference.html">第7部分. 推理</a> <a class="dropdown-item" href="applied-inference.html">第8部分. 服务 LLaMA</a> <a class="dropdown-item" href="profiling.html">第9部分. 性能分析</a> <a class="dropdown-item" href="jax-stuff.html">第10部分. 全面了解 JAX</a> <a class="dropdown-item" href="conclusion.html">第11部分. 结论</a> <a class="dropdown-item" href="gpus.html">第12部分. GPU</a> </div> </li> <li class="toggle-container"> <button id="light-toggle" title="切换主题"> <i class="ti ti-sun-moon" id="light-toggle-system"></i> <i class="ti ti-moon-filled" id="light-toggle-dark"></i> <i class="ti ti-sun-filled" id="light-toggle-light"></i> </button> </li> </ul> </div> </div> </nav> <progress id="progress" value="0"> <div class="progress-container"> <span class="progress-bar"></span> </div> </progress> </header> <div class="post distill"><div class="translation-info base-grid" style="margin-bottom: 20px;">
+<div style="grid-column: text;
+                       display: flex;
+                       align-items: center;
+                       justify-content: space-between;
+                       padding: 16px 0;
+                       border-bottom: 1px solid var(--global-text-color-light, rgba(0,0,0,0.15));
+                       font-size: 16px;
+                       line-height: 1.5;
+                       color: var(--global-text-color, currentColor);">
+<div style="display: flex;
+                           flex-direction: column;
+                           gap: 8px;">
+<div>
+<span style="font-weight: 600; color: var(--global-text-color, currentColor);">🔗 英文原文：</span>
+<a href="https://jax-ml.github.io/scaling-book/applied-training/" onmouseout="this.style.textDecoration='none'" onmouseover="this.style.textDecoration='underline'" rel="noopener noreferrer" style="color: var(--global-theme-color, #004276);
+                                  text-decoration: none;
+                                  margin-left: 4px;" target="_blank">
+                           https://jax-ml.github.io/scaling-book/applied-training/
+                        </a>
+</div>
+<div>
+<span style="font-weight: 600; color: var(--global-text-color, currentColor);">✍️ 翻译：</span>
+<span style="margin-left: 4px; color: var(--global-text-color, currentColor);">北极的树</span>
+</div>
+</div>
+<div style="flex-shrink: 0;
+                           display: flex;
+                           flex-direction: column;
+                           align-items: center;
+                           gap: 6px;
+                           margin-left: 20px;">
+<img alt="微信二维码" loading="lazy" src="https://wechat-account-1251781786.cos.ap-guangzhou.myqcloud.com/wechat_account.jpeg" style="width: 80px;
+                                height: 80px;
+                                border-radius: 6px;
+                                opacity: 0.9;"/>
+<span style="font-size: 12px;
+                                 color: var(--global-text-color-light, currentColor);
+                                 opacity: 0.8;
+                                 text-align: center;">
+                        微信公众号
+                    </span>
+</div>
+</div>
+</div> <d-title> <h1>在 TPU 上训练 LLaMA 3</h1> <p>《如何扩展你的模型》第6部分 (<a href="training.html">第5部分：训练</a> | <a href="inference.html">第7部分：推理</a>)</p> <p>让我们仔细研究一下如何利用上一节学到的知识，在 TPU v5p 上训练 LLaMA 3 模型。它们有多大？在不同配置下训练的成本有多高？它们是如何分片的？让我们通过一些粗略的估算，来探讨前面几节的内容如何应用到真实模型上。</p> </d-title> <d-byline>
+<div class="byline grid">
+<div class="authors-affiliations grid">
+<h3 style="grid-column: 1; grid-row: 1;">作者</h3>
+<h3></h3>
+<h3>所属机构</h3>
+<p class="author" style="grid-column: 1; grid-row: 2;">
+<a class="name" href="https://www.jacobaustin.org/">Jacob Austin</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 2;">
+<span class="affiliation">Google DeepMind</span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 3;">
+<a class="name" href="https://x.com/_sholtodouglas">Sholto Douglas</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 3;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 4;">
+<a class="name" href="https://cs.stanford.edu/~rfrostig/">Roy Frostig</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 4;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 5;">
+<a class="name" href="https://anselmlevskaya.com/">Anselm Levskaya</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 5;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 6;">
+<a class="name" href="https://x.com/charliexychen">Charlie Chen</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 6;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 7;">
+<a class="name" href="https://sharadvikram.com/">Sharad Vikram</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 7;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 2;">
+<a class="name" href="https://fedelebron.com/">Federico Lebron</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 2;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 3;">
+<a class="name" href="https://x.com/pchoy95">Peter Choy</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 3;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 4;">
+<a class="name" href="https://x.com/vinayramasesh">Vinay Ramasesh</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 4;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 5;">
+<a class="name" href="https://representation.ai/">Albert Webson</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 5;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 6;">
+<a class="name" href="https://x.com/reinerpope">Reiner Pope<sup>*</sup></a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 6;">
+<span class="affiliation"></span>
+</p>
+</div>
+<div>
+<h3>发布日期</h3>
+<p>2025年2月4日</p>
+</div>
+</div>
+</d-byline> <d-article> <d-contents> <nav class="l-text figcaption"> <h3>目录</h3> <div> <a href="#what-does-llama-3-look-like">LLaMA 3 的架构是怎样的？</a> </div> <div> <a href="#counting-parameters-and-flops">计算参数量和 FLOPs</a> </div> <div> <a href="#how-to-shard-llama-3-70b-for-training">如何为 LLaMA 3-70B 的训练进行分片</a> </div> <div> <a href="#worked-problems">练习题</a> </div> </nav> </d-contents> <p><em>本节的目标是将上一节的结论应用到一个非常实际的问题上：训练 LLaMA 3 系列模型。与前面几节不同，我们希望你能亲自动手完成大部分工作。因此，我们隐藏了每个小节的答案，以便你可以先尝试自己解答。试试拿起笔，手动计算一下吧！</em></p> <h3 id="what-does-llama-3-look-like">LLaMA 3 的架构是怎样的？</h3> <p>LLaMA-3 模型家族<d-cite key="llama3"></d-cite>包含3个主要模型：LLaMA 3 8B、70B 和 405B。我们将主要关注 70B 模型，并将 8B 和 405B 模型留到最后的练习题部分供你探索。以下是 LLaMA 3-70B 的架构，摘自 LLaMA 的 <a href="https://huggingface.co/meta-llama/Meta-Llama-3-70B/blob/main/config.json" rel="external nofollow noopener" target="_blank">HuggingFace 页面</a>。</p> <table class="table-hover" data-toggle="table"> <thead> <tr> <th><strong>超参数</strong></th> <th><strong>值</strong></th> </tr> </thead> <tbody> <tr> <td><mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="0" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D45B TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em;"><mjx-mtext class="mjx-n" size="s"><mjx-c class="mjx-c6C"></mjx-c><mjx-c class="mjx-c61"></mjx-c><mjx-c class="mjx-c79"></mjx-c><mjx-c class="mjx-c65"></mjx-c><mjx-c class="mjx-c72"></mjx-c><mjx-c class="mjx-c73"></mjx-c></mjx-mtext></mjx-script></mjx-msub></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><msub><mi>n</mi><mtext>layers</mtext></msub></math></mjx-assistive-mml></mjx-container> (L)</td> <td>80</td> </tr> <tr> <td><mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="1" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D451 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em;"><mjx-mtext class="mjx-n" size="s"><mjx-c class="mjx-c6D"></mjx-c><mjx-c class="mjx-c6F"></mjx-c><mjx-c class="mjx-c64"></mjx-c><mjx-c class="mjx-c65"></mjx-c><mjx-c class="mjx-c6C"></mjx-c></mjx-mtext></mjx-script></mjx-msub></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><msub><mi>d</mi><mtext>model</mtext></msub></math></mjx-assistive-mml></mjx-container> (D)</td> <td>8,192</td> </tr> <tr> <td><mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="2" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D451 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em;"><mjx-texatom size="s" texclass="ORD"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D453 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D453 TEX-I"></mjx-c></mjx-mi></mjx-texatom></mjx-script></mjx-msub></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><msub><mi>d</mi><mrow data-mjx-texclass="ORD"><mi>f</mi><mi>f</mi></mrow></msub></math></mjx-assistive-mml></mjx-container> (F)</td> <td>28,672</td> </tr> <tr> <td><mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="3" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D45B TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em;"><mjx-mtext class="mjx-n" size="s"><mjx-c class="mjx-c68"></mjx-c><mjx-c class="mjx-c65"></mjx-c><mjx-c class="mjx-c61"></mjx-c><mjx-c class="mjx-c64"></mjx-c><mjx-c class="mjx-c73"></mjx-c></mjx-mtext></mjx-script></mjx-msub></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><msub><mi>n</mi><mtext>heads</mtext></msub></math></mjx-assistive-mml></mjx-container> (N)</td> <td>64</td> </tr> <tr> <td><mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="4" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D45B TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em;"><mjx-mtext class="mjx-n" size="s"><mjx-c class="mjx-c6B"></mjx-c><mjx-c class="mjx-c76"></mjx-c><mjx-c class="mjx-c5F"></mjx-c><mjx-c class="mjx-c68"></mjx-c><mjx-c class="mjx-c65"></mjx-c><mjx-c class="mjx-c61"></mjx-c><mjx-c class="mjx-c64"></mjx-c><mjx-c class="mjx-c73"></mjx-c></mjx-mtext></mjx-script></mjx-msub></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><msub><mi>n</mi><mtext>kv_heads</mtext></msub></math></mjx-assistive-mml></mjx-container> (K)</td> <td>8</td> </tr> <tr> <td><mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="5" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D451 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em;"><mjx-mtext class="mjx-n" size="s"><mjx-c class="mjx-c71"></mjx-c><mjx-c class="mjx-c6B"></mjx-c><mjx-c class="mjx-c76"></mjx-c></mjx-mtext></mjx-script></mjx-msub></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><msub><mi>d</mi><mtext>qkv</mtext></msub></math></mjx-assistive-mml></mjx-container> (H)</td> <td>128</td> </tr> <tr> <td><mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="6" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D45B TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em;"><mjx-mtext class="mjx-n" size="s"><mjx-c class="mjx-c65"></mjx-c><mjx-c class="mjx-c6D"></mjx-c><mjx-c class="mjx-c62"></mjx-c><mjx-c class="mjx-c65"></mjx-c><mjx-c class="mjx-c64"></mjx-c><mjx-c class="mjx-c64"></mjx-c><mjx-c class="mjx-c69"></mjx-c><mjx-c class="mjx-c6E"></mjx-c><mjx-c class="mjx-c67"></mjx-c><mjx-c class="mjx-c73"></mjx-c></mjx-mtext></mjx-script></mjx-msub></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><msub><mi>n</mi><mtext>embeddings</mtext></msub></math></mjx-assistive-mml></mjx-container> (V)</td> <td>128,256</td> </tr> </tbody> </table> <p>为了凸显找到这些信息有多容易，下面是配置本身及其映射关系：</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/llama-json-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/llama-json-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/llama-json-1400.webp 1400w" type="image/webp"/> <img class="img-fluid" height="487" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/llama-json.png" width="1026"/> </picture> </figure> <p><em>为许多不同的开源 LLM 制作一个包含这些数字的大表格会很有用，这样你就可以快速比较它们在设计上所做的决策。</em></p> <h3 id="counting-parameters-and-flops">计算参数量和 FLOPs</h3> <p><strong>问题：</strong>根据这个表格，我们能计算出 LLaMA 3-70B 的参数数量吗？🤫 让我们应用<a href="transformers.html">第4节</a>的内容，看看能否得到 70B 这个数字！</p> <table class="table-hover" data-toggle="table"> <thead> <tr> <th>参数</th> <th>公式</th> <th>数量</th> </tr> </thead> <tbody> <tr> <td>FFW 参数</td> <td>d_model * d_ff * 3 (用于 gelu + 输出投影) * n_layers</td> <td>8,192 * 8,192 * 3.5 * 3 * 80 = <strong>56.3e9</strong> </td> </tr> <tr> <td>词表参数</td> <td>2 (输入和输出嵌入) * n_embeddings * d_model</td> <td>2 * 128,256 * 8,192 = <strong>2.1e9</strong> </td> </tr> <tr> <td>注意力参数</td> <td>n_layers * [ 2 (用于q嵌入和拼接的输出投影) * d_model * n_heads * d_qkv + 2 (用于k和v) * d_model * n_kv_heads * d_qkv]</td> <td>80 * (2 * 8,192 * 64 * 128 + 2 * 8,192 * 8 * 128) = <strong>12e9</strong> </td> </tr> <tr> <td> </td> <td> </td> <td>56.3e9 + 2.1e9 + 12e9 = <strong>70.4e9</strong> </td> </tr> </tbody> </table> <p>太棒了！我们得到了预期的数字。你会注意到，正如预期的那样，FFW 参数在总参数量中占绝对主导地位，尽管注意力机制的参数也不可忽略。</p> <p class="takeaway"><strong>要点</strong>：MLP 模块中的3个大型权重矩阵比 Transformer 中的所有其他数组都要大得多，因此在推断模型内存或 FLOPs 时，我们通常几乎可以忽略所有其他参数。对于 LLaMA 3-70B，它们占了70B参数中的56B。</p> <p>现在我们来看看 FLOPs！<em>记住<a href="transformers.html">第4节</a>中关于训练的一般规则。</em></p> <p><strong>问题：</strong>LLaMA-3 在每个训练步骤中为每个 token 执行多少 FLOPs？<em>这有助于我们确定整个训练过程的成本。</em></p> <details><summary>思考后，点击此处查看答案！</summary> <p><strong>答案</strong>：如<a href="transformers.html">第4节</a>所示，每个 token 大约需要 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="7" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mn class="mjx-n"><mjx-c class="mjx-c36"></mjx-c></mjx-mn><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c22C5"></mjx-c></mjx-mo><mjx-mtext class="mjx-n" space="3"><mjx-c class="mjx-c70"></mjx-c><mjx-c class="mjx-c61"></mjx-c><mjx-c class="mjx-c72"></mjx-c><mjx-c class="mjx-c61"></mjx-c><mjx-c class="mjx-c6D"></mjx-c><mjx-c class="mjx-c20"></mjx-c><mjx-c class="mjx-c63"></mjx-c><mjx-c class="mjx-c6F"></mjx-c><mjx-c class="mjx-c75"></mjx-c><mjx-c class="mjx-c6E"></mjx-c><mjx-c class="mjx-c74"></mjx-c></mjx-mtext></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mn>6</mn><mo>⋅</mo><mtext>param count</mtext></math></mjx-assistive-mml></mjx-container> FLOPs，所以这里大约是 <code class="language-plaintext highlighter-rouge">6 * 70e9 = 4.2e11</code> FLOPs / token。这大约是每个 token 每步半个 TFLOP。假设我们受计算限制，且 FLOPs 利用率完美，这在单个 TPU v5p 芯片上大约需要 <code class="language-plaintext highlighter-rouge">4.2e11 / 4.59E+14 = 1ms</code>。</p> </details> <p><strong>问题：</strong>LLaMA 3 训练了大约 15 万亿个 token。总共需要多少 FLOPs？</p> <details><summary>思考后，点击此处查看答案！</summary> <p><strong>答案</strong>：这很简单，就是 <code class="language-plaintext highlighter-rouge">4.2e11 * 15e12 = 6.3e24 FLOPs</code>。总计 6.3 yottaFLOPs。这个数字非常大！在单个 TPU 上，这将需要 <code class="language-plaintext highlighter-rouge">6.3e24 / 4.59E+14 = 435 年</code>。这也太久了！</p> </details> <p><strong>问题：</strong>假设我们想在一个包含 16x20x28 = 8960 个芯片的完整 TPU v5p pod 上进行训练。假设我们受计算限制，在使用 bfloat16 格式且 MFU 为 40% 的情况下，训练需要多长时间？</p> <details><summary>思考后，点击此处查看答案！</summary> <p><strong>答案</strong>：我们知道每个 TPU v5p 每秒可以执行 4.59e14 FLOPs。在 40% MFU 的情况下，这大约需要 <code class="language-plaintext highlighter-rouge">T = 6.3e24 / (8960 * 4.59e14 * 0.4) = 3.8e6 seconds</code>。<strong>这大约是 44 天！</strong>这个时间相当合理，前提是我们真的能达到 40% 的 MFU。</p> </details> <p><strong>问题：</strong>LLaMA 3-70B 的预训练批次大小约为 4M token。使用这个批次大小进行训练，我们最少需要多少个 TPU？<em>你可以假设参数为 bfloat16 格式，优化器状态为 float32 格式，并且每层对梯度进行 4 次检查点操作。</em></p> <details><summary>思考后，点击此处查看答案！</summary> <p><strong>答案</strong>：这个问题主要是在问内存使用情况，因为这是对可用计算资源的唯一硬性约束。在训练期间，HBM 主要有三个用途：模型参数、优化器状态和梯度检查点。如果我们假设权重为 bfloat16，优化器状态为 float32，并采用一个<em>非常</em>保守的梯度检查点方案（每层 4 次），我们得到：</p> <table class="table-hover" data-toggle="table"> <tbody> <tr> <td><strong>参数</strong></td> <td>2 * 70GB</td> <td>~140GB</td> </tr> <tr> <td><strong>优化器状态</strong></td> <td>8 * 70GB</td> <td>~560GB</td> </tr> <tr> <td><strong>梯度检查点</strong></td> <td>2 * 8192 * 4e6 * 4 * 80</td> <td>~20.9TB</td> </tr> <tr> <td><strong>总计</strong></td> <td> </td> <td>~21.6TB</td> </tr> </tbody> </table> <p>这里的总内存约为 21.6TB。你会注意到，即使采用了非常保守的检查点方案，梯度检查点仍在内存使用中占主导地位。理论上，我们可以每层只设置 1 个检查点，或者使用微批处理，但这已经是一个合理的估算了。基于这些假设，由于每个 TPU v5p 有 96GB 的 HBM，我们需要 <code class="language-plaintext highlighter-rouge">21.6e12 / 96e9 = 225</code> 个 TPU。实际上这并不算多！</p> <p><em>我们为什么不这样做呢？</em>嗯，因为这会花费我们 <code class="language-plaintext highlighter-rouge">44 days * 8960 / 225 = 1752 days</code> 的时间来训练。这差不多是四年。<strong>时间太长了。</strong>尽管如此，这清楚地表明，我们使用这些大型集群并非因为受到内存限制，而是因为我们需要额外的 FLOPs。</p> </details> <p><strong>问题：</strong>在与上一个问题相同的假设下，如果我们使用 8960 个 TPU v5p 芯片，每个芯片将使用多少内存？</p> <details><summary>思考后，点击此处查看答案！</summary> <p><strong>答案</strong>：我们的总内存仍然是大约 21.6TB，所以每个芯片大约使用 2.4GB，这基本上可以忽略不计。如果我们采用更激进的检查点策略，例如每层 12 个检查点，每个芯片也只占用 8GB。在这种规模的训练中，我们远未达到内存瓶颈。</p> </details> <p class="takeaway"><strong>要点</strong>：从技术上讲，即使在非常小的拓扑结构上训练非常大的模型也是可能的，但需要注意的是，这可能会花费很长时间。能够计算出一次训练运行的总 FLOPs，使我们能够通过假设一个适度的 MFU 和已知的拓扑结构来粗略估计其训练时间。</p> <h3 id="how-to-shard-llama-3-70b-for-training">如何为 LLaMA 3-70B 的训练进行分片</h3> <p>让我们继续沿用上面的设定，假设我们想在一个包含 8960 个芯片的 TPU v5p pod 上，以 4M token 的批次大小（每批次 1024 个序列，每个序列长度为 4096）来训练 LLaMA 3-70B。让我们来讨论一下针对这个模型的最佳分片策略。</p> <p><strong>问题：</strong>在上述假设下，我们能否仅使用 FSDP 来训练我们的模型？首先，我们假设不能进行任何序列/上下文并行。<em>这应该是你首先想到的方案，因为它很简单，并且如果可行的话，不会引入额外的通信开销。</em></p> <details><summary>思考后，点击此处查看答案！</summary> <p><strong>答案</strong>：这个答案可能有点迂腐。如上所述，LLaMA 3-70B 最初是用长度为 4K 的序列进行训练的，所以 4M token 的批次大小给了我们 1024 的<em>序列批次大小</em>。这意味着我们最多只能在 1024 个芯片上进行纯数据并行/FSDP，<em>因为我们只有这么多序列可以用来做数据并行</em>。所以，从“完全数据并行且无额外通信”这个简单意义上来说，答案是否定的。下一个问题将回答一个不那么迂腐的版本。</p> </details> <p><strong>问题：</strong>让我们放宽不进行任何序列分片的要求。如果我们允许自己同时在批次<em>和</em>序列维度上进行 FSDP，我们能否仅用 FSDP 在 8960 个芯片上训练 LLaMA 3-70B？</p> <details><summary>思考后，点击此处查看答案！</summary> <p><strong>答案</strong>：现在我们允许自己也进行序列/上下文并行，这样就可以扩展到更大的规模。首先，让我们计算每个设备的批次大小。如果我们进行 8960 路 FSDP，每个 TPU 的批次大小最终为 <code class="language-plaintext highlighter-rouge">4 * 1024 * 1024 / 8960 = 468 tokens</code>。从上一节我们知道，当 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="8" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mtext class="mjx-n"><mjx-c class="mjx-c70"></mjx-c><mjx-c class="mjx-c65"></mjx-c><mjx-c class="mjx-c72"></mjx-c><mjx-c class="mjx-c20"></mjx-c><mjx-c class="mjx-c64"></mjx-c><mjx-c class="mjx-c65"></mjx-c><mjx-c class="mjx-c76"></mjx-c><mjx-c class="mjx-c69"></mjx-c><mjx-c class="mjx-c63"></mjx-c><mjx-c class="mjx-c65"></mjx-c><mjx-c class="mjx-c20"></mjx-c><mjx-c class="mjx-c62"></mjx-c><mjx-c class="mjx-c61"></mjx-c><mjx-c class="mjx-c74"></mjx-c><mjx-c class="mjx-c63"></mjx-c><mjx-c class="mjx-c68"></mjx-c><mjx-c class="mjx-c20"></mjx-c><mjx-c class="mjx-c73"></mjx-c><mjx-c class="mjx-c69"></mjx-c><mjx-c class="mjx-c7A"></mjx-c><mjx-c class="mjx-c65"></mjx-c></mjx-mtext><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3C"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="4"><mjx-c class="mjx-c32"></mjx-c><mjx-c class="mjx-c35"></mjx-c><mjx-c class="mjx-c35"></mjx-c><mjx-c class="mjx-c30"></mjx-c></mjx-mn><mjx-texatom texclass="ORD"><mjx-mo class="mjx-n"><mjx-c class="mjx-c2F"></mjx-c></mjx-mo></mjx-texatom><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D440 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.081em;"><mjx-mi class="mjx-i" size="s"><mjx-c class="mjx-c1D44B TEX-I"></mjx-c></mjx-mi></mjx-script></mjx-msub></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mtext>per device batch size</mtext><mo>&lt;</mo><mn>2550</mn><mrow data-mjx-texclass="ORD"><mo>/</mo></mrow><msub><mi>M</mi><mi>X</mi></msub></math></mjx-assistive-mml></mjx-container> 时，FSDP 会受到 ICI 的限制。由于我们可以在一个完整的 3D pod 中使用 3 个轴，这将给我们一个 850 的下限，而我们远低于这个值。<strong>所以答案是否定的，即使有 3 个轴也不行。我们将完全受限于通信。</strong></p> </details> <p><strong>问题：</strong>现在让我们看看混合张量并行和 FSDP。是否存在某种组合，能让我们保持受计算限制？如果存在，我们应该使用多大程度的 FSDP 和张量并行？</p> <details><summary>思考后，点击此处查看答案！</summary> <p><strong>答案</strong>：首先，让我们检查一下这是否可行。我们知道，如果每个芯片的批次大小小于 <d-math>2550^2 / 2F = 113</d-math>，我们就会受通信限制。正如我们上面看到的，我们的值略高于此。这太好了！现在，为了选择最佳的 FSDP 数量，我们可以使用公式</p> <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="9" display="true" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX" display="true" style="margin-left: 0px; margin-right: 0px;"><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D44B TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.024em;"><mjx-texatom size="s" texclass="ORD"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D45C TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D45D TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D461 TEX-I"></mjx-c></mjx-mi></mjx-texatom></mjx-script></mjx-msub><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-msqrt space="4"><mjx-sqrt><mjx-surd><mjx-mo class="mjx-s3"><mjx-c class="mjx-c221A TEX-S3"></mjx-c></mjx-mo></mjx-surd><mjx-box style="padding-top: 0.233em;"><mjx-mfrac><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D441 TEX-I"></mjx-c></mjx-mi></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac></mjx-box></mjx-sqrt></mjx-msqrt><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-msqrt space="4"><mjx-sqrt><mjx-surd><mjx-mo class="mjx-s3"><mjx-c class="mjx-c221A TEX-S3"></mjx-c></mjx-mo></mjx-surd><mjx-box style="padding-top: 0.225em;"><mjx-mfrac><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c22C5"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="3"><mjx-c class="mjx-c34"></mjx-c><mjx-c class="mjx-c2E"></mjx-c><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c39"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D452 TEX-I"></mjx-c></mjx-mi><mjx-mn class="mjx-n"><mjx-c class="mjx-c36"></mjx-c></mjx-mn><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c22C5"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="3"><mjx-c class="mjx-c38"></mjx-c><mjx-c class="mjx-c39"></mjx-c><mjx-c class="mjx-c36"></mjx-c><mjx-c class="mjx-c30"></mjx-c></mjx-mn></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c><mjx-c class="mjx-c38"></mjx-c><mjx-c class="mjx-c36"></mjx-c><mjx-c class="mjx-c37"></mjx-c><mjx-c class="mjx-c32"></mjx-c></mjx-mn></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac></mjx-box></mjx-sqrt></mjx-msqrt><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="4"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c36"></mjx-c><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c38"></mjx-c></mjx-mn></mjx-math><mjx-assistive-mml display="block" unselectable="on"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><msub><mi>X</mi><mrow data-mjx-texclass="ORD"><mi>o</mi><mi>p</mi><mi>t</mi></mrow></msub><mo>=</mo><msqrt><mfrac><mrow><mn>2</mn><mi>B</mi><mi>N</mi></mrow><mi>F</mi></mfrac></msqrt><mo>=</mo><msqrt><mfrac><mrow><mn>2</mn><mo>⋅</mo><mn>4.19</mn><mi>e</mi><mn>6</mn><mo>⋅</mo><mn>8960</mn></mrow><mn>28672</mn></mfrac></msqrt><mo>=</mo><mn>1618</mn></math></mjx-assistive-mml></mjx-container> <p>四舍五入到一个合理的 2 的倍数，这给了我们大约 2048 路 FSDP 和 4 路模型并行。这应该能很好地工作！</p> </details> <p class="takeaway"><strong>要点</strong>：我们可以在一个完整的 TPU v5p pod 上，通过混合使用数据并行（1024 路）、序列并行（2 路）和张量并行（4 路）的方式，以 4M token 的批次大小训练 LLaMA-3，而不会受通信限制。如果我们尝试使用纯 FSDP 或 FSDP + 序列并行，则会受通信限制。我们在上一节中推导出的方程非常实用。</p> <h2 id="worked-problems">练习题</h2> <p><strong>问题1 [将 LLaMA 70B 扩展到更多芯片]：</strong>假设我们想在 4 个 pod 上以相同的批次大小训练 LLaMA 3-70B。我们会使用哪种并行方案？我们会受计算限制还是通信限制？训练大约需要多长时间？<em>请确保使用正确的屋顶线边界。</em></p> <p><strong>问题2 [LLaMA 405B]：</strong></p> <p>(a) 使用 LLaMA 3-405B 的<a href="https://huggingface.co/meta-llama/Llama-3.1-405B/blob/main/config.json" rel="external nofollow noopener" target="_blank">配置</a>，像上面一样写一个包含所有关键超参数的表格。这个模型总共有多少参数？每个训练步骤需要多少 FLOPs？如果我们用 15T token 进行训练，总共会执行多少 FLOPs？</p> <p>(b) 假设我们想在 8 个 TPU v5p pod 上进行训练。我们会使用哪种并行方案？训练需要多长时间？会受计算限制还是通信限制？</p> <h3 class="next-section">第6节到此结束。关于第7节 Transformer 推理的内容，请点击<a href="inference.html">这里</a>。</h3> </d-article> <d-appendix>
+<style>
+
+d-appendix {
+  contain: layout style;
+  font-size: 0.8em;
+  line-height: 1.7em;
+  margin-top: 60px;
+  margin-bottom: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  color: rgba(0,0,0,0.5);
+  padding-top: 60px;
+  padding-bottom: 48px;
+}
+
+d-appendix h3 {
+  grid-column: page-start / text-start;
+  font-size: 15px;
+  font-weight: 500;
+  margin-top: 1em;
+  margin-bottom: 0;
+  color: rgba(0,0,0,0.65);
+}
+
+d-appendix h3 + * {
+  margin-top: 1em;
+}
+
+d-appendix ol {
+  padding: 0 0 0 15px;
+}
+
+@media (min-width: 768px) {
+  d-appendix ol {
+    padding: 0 0 0 30px;
+    margin-left: -30px;
+  }
+}
+
+d-appendix li {
+  margin-bottom: 1em;
+}
+
+d-appendix a {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+d-appendix > * {
+  grid-column: text;
+}
+
+d-appendix > d-footnote-list,
+d-appendix > d-citation-list,
+d-appendix > distill-appendix {
+  grid-column: screen;
+}
+
+</style>
+<d-footnote-list style="display: none;">
+<style>
+
+d-footnote-list {
+  contain: layout style;
+}
+
+d-footnote-list > * {
+  grid-column: text;
+}
+
+d-footnote-list a.footnote-backlink {
+  color: rgba(0,0,0,0.3);
+  padding-left: 0.5em;
+}
+
+</style>
+<h3>脚注</h3>
+<ol></ol>
+</d-footnote-list> <d-citation-list style=""><style>
+d-citation-list {
+  contain: style;
+}
+
+d-citation-list .references {
+  grid-column: text;
+}
+
+d-citation-list .references .title {
+  font-weight: 500;
+}
+</style><h3 id="references">参考文献</h3><ol class="references" id="references-list"><li id="llama3"><span class="title">The Llama 3 herd of models</span> <br/>Grattafiori, A., Dubey, A., Jauhri, A., Pandey, A., Kadian, A., Al-Dahle, A., Letman, A., Mathur, A., Schelten, A., Vaughan, A., Yang, A., Fan, A., Goyal, A., Hartshorn, A., Yang, A., Mitra, A., Sravankumar, A., Korenev, A., Hinsvark, A., Rao, A., Zhang, A., Rodriguez, A., Gregerson, A., Spataru, A., Roziere, B., Biron, B., Tang, B., Chern, B., Caucheteux, C., Nayak, C., Bi, C., Marra, C., McConnell, C., Keller, C., Touret, C., Wu, C., Wong, C., Ferrer, C.C., Nikolaidis, C., Allonsius, D., Song, D., Pintz, D., Livshits, D., Wyatt, D., Esiobu, D., Choudhary, D., Mahajan, D., Garcia-Olano, D., Perino, D., Hupkes, D., Lakomkin, E., AlBadawy, E., Lobanova, E., Dinan, E., Smith, E.M., Radenovic, F., Guzmán, F., Zhang, F., Synnaeve, G., Lee, G., Anderson, G.L., Thattai, G., Nail, G., Mialon, G., Pang, G., Cucurell, G., Nguyen, H., Korevaar, H., Xu, H., Touvron, H., Zarov, I., Ibarra, I.A., Kloumann, I., Misra, I., Evtimov, I., Zhang, J., Copet, J., Lee, J., Geffert, J., Vranes, J., Park, J., Mahadeokar, J., Shah, J., van der Linde, J., Billock, J., Hong, J., Lee, J., Fu, J., Chi, J., Huang, J., Liu, J., Wang, J., Yu, J., Bitton, J., Spisak, J., Park, J., Rocca, J., Johnstun, J., Saxe, J., Jia, J., Alwala, K.V., Prasad, K., Upasani, K., Plawiak, K., Li, K., Heafield, K., Stone, K., El-Arini, K., Iyer, K., Malik, K., Chiu, K., Bhalla, K., Lakhotia, K., Rantala-Yeary, L., van der Maaten, L., Chen, L., Tan, L., Jenkins, L., Martin, L., Madaan, L., Malo, L., Blecher, L., Landzaat, L., de Oliveira, L., Muzzi, M., Pasupuleti, M., Singh, M., Paluri, M., Kardas, M., Tsimpoukelli, M., Oldham, M., Rita, M., Pavlova, M., Kambadur, M., Lewis, M., Si, M., Singh, M.K., Hassan, M., Goyal, N., Torabi, N., Bashlykov, N., Bogoychev, N., Chatterji, N., Zhang, N., Duchenne, O., Çelebi, O., Alrassy, P., Zhang, P., Li, P., Vasic, P., Weng, P., Bhargava, P., Dubal, P., Krishnan, P., Koura, P.S., Xu, P., He, Q., Dong, Q., Srinivasan, R., Ganapathy, R., Calderer, R., Cabral, R.S., Stojnic, R., Raileanu, R., Maheswari, R., Girdhar, R., Patel, R., Sauvestre, R., Polidoro, R., Sumbaly, R., Taylor, R., Silva, R., Hou, R., Wang, R., Hosseini, S., Chennabasappa, S., Singh, S., Bell, S., Kim, S.S., Edunov, S., Nie, S., Narang, S., Raparthy, S., Shen, S., Wan, S., Bhosale, S., Zhang, S., Vandenhende, S., Batra, S., Whitman, S., Sootla, S., Collot, S., Gururangan, S., Borodinsky, S., Herman, T., Fowler, T., Sheasha, T., Georgiou, T., Scialom, T., Speckbacher, T., Mihaylov, T., Xiao, T., Karn, U., Goswami, V., Gupta, V., Ramanathan, V., Kerkez, V., Gonguet, V., Do, V., Vogeti, V., Albiero, V., Petrovic, V., Chu, W., Xiong, W., Fu, W., Meers, W., Martinet, X., Wang, X., Wang, X., Tan, X.E., Xia, X., Xie, X., Jia, X., Wang, X., Goldschlag, Y., Gaur, Y., Babaei, Y., Wen, Y., Song, Y., Zhang, Y., Li, Y., Mao, Y., Coudert, Z.D., Yan, Z., Chen, Z., Papakipos, Z., Singh, A., Srivastava, A., Jain, A., Kelsey, A., Shajnfeld, A., Gangidi, A., Victoria, A., Goldstand, A., Menon, A., Sharma, A., Boesenberg, A., Baevski, A., Feinstein, A., Kallet, A., Sangani, A., Teo, A., Yunus, A., Lupu, A., Alvarado, A., Caples, A., Gu, A., Ho, A., Poulton, A., Ryan, A., Ramchandani, A., Dong, A., Franco, A., Goyal, A., Saraf, A., Chowdhury, A., Gabriel, A., Bharambe, A., Eisenman, A., Yazdan, A., James, B., Maurer, B., Leonhardi, B., Huang, B., Loyd, B., De Paola, B., Paranjape, B., Liu, B., Wu, B., Ni, B., Hancock, B., Wasti, B., Spence, B., Stojkovic, B., Gamido, B., Montalvo, B., Parker, C., Burton, C., Mejia, C., Liu, C., Wang, C., Kim, C., Zhou, C., Hu, C., Chu, C., Cai, C., Tindal, C., Feichtenhofer, C., Gao, C., Civin, D., Beaty, D., Kreymer, D., Li, D., Adkins, D., Xu, D., Testuggine, D., David, D., Parikh, D., Liskovich, D., Foss, D., Wang, D., Le, D., Holland, D., Dowling, E., Jamil, E., Montgomery, E., Presani, E., Hahn, E., Wood, E., Le, E., Brinkman, E., Arcaute, E., Dunbar, E., Smothers, E., Sun, F., Kreuk, F., Tian, F., Kokkinos, F., Ozgenel, F., Caggioni, F., Kanayet, F., Seide, F., Florez, G.M., Schwarz, G., Badeer, G., Swee, G., Halpern, G., Herman, G., Sizov, G., {Guangyi},, {Zhang},, Lakshminarayanan, G., Inan, H., Shojanazeri, H., Zou, H., Wang, H., Zha, H., Habeeb, H., Rudolph, H., Suk, H., Aspegren, H., Goldman, H., Zhan, H., Damlaj, I., Molybog, I., Tufanov, I., Leontiadis, I., Veliche, I., Gat, I., Weissman, J., Geboski, J., Kohli, J., Lam, J., Asher, J., Gaya, J., Marcus, J., Tang, J., Chan, J., Zhen, J., Reizenstein, J., Teboul, J., Zhong, J., Jin, J., Yang, J., Cummings, J., Carvill, J., Shepard, J., McPhie, J., Torres, J., Ginsburg, J., Wang, J., Wu, K., U, K.H., Saxena, K., Khandelwal, K., Zand, K., Matosich, K., Veeraraghavan, K., Michelena, K., Li, K., Jagadeesh, K., Huang, K., Chawla, K., Huang, K., Chen, L., Garg, L., A, L., Silva, L., Bell, L., Zhang, L., Guo, L., Yu, L., Moshkovich, L., Wehrstedt, L., Khabsa, M., Avalani, M., Bhatt, M., Mankus, M., Hasson, M., Lennie, M., Reso, M., Groshev, M., Naumov, M., Lathi, M., Keneally, M., Liu, M., Seltzer, M.L., Valko, M., Restrepo, M., Patel, M., Vyatskov, M., Samvelyan, M., Clark, M., Macey, M., Wang, M., Hermoso, M.J., Metanat, M., Rastegari, M., Bansal, M., Santhanam, N., Parks, N., White, N., Bawa, N., Singhal, N., Egebo, N., Usunier, N., Mehta, N., Laptev, N.P., Dong, N., Cheng, N., Chernoguz, O., Hart, O., Salpekar, O., Kalinli, O., Kent, P., Parekh, P., Saab, P., Balaji, P., Rittner, P., Bontrager, P., Roux, P., Dollar, P., Zvyagina, P., Ratanchandani, P., Yuvraj, P., Liang, Q., Alao, R., Rodriguez, R., Ayub, R., Murthy, R., Nayani, R., Mitra, R., Parthasarathy, R., Li, R., Hogan, R., Battey, R., Wang, R., Howes, R., Rinott, R., Mehta, S., Siby, S., Bondu, S.J., Datta, S., Chugh, S., Hunt, S., Dhillon, S., Sidorov, S., Pan, S., Mahajan, S., Verma, S., Yamamoto, S., Ramaswamy, S., Lindsay, S., Lindsay, S., Feng, S., Lin, S., Zha, S.C., Patil, S., Shankar, S., Zhang, S., Zhang, S., Wang, S., Agarwal, S., Sajuyigbe, S., Chintala, S., Max, S., Chen, S., Kehoe, S., Satterfield, S., Govindaprasad, S., Gupta, S., Deng, S., Cho, S., Virk, S., Subramanian, S., Choudhury, S., Goldman, S., Remez, T., Glaser, T., Best, T., Koehler, T., Robinson, T., Li, T., Zhang, T., Matthews, T., Chou, T., Shaked, T., Vontimitta, V., Ajayi, V., Montanez, V., Mohan, V., Kumar, V.S., Mangla, V., Ionescu, V., Poenaru, V., Mihailescu, V.T., Ivanov, V., Li, W., Wang, W., Jiang, W., Bouaziz, W., Constable, W., Tang, X., Wu, X., Wang, X., Wu, X., Gao, X., Kleinman, Y., Chen, Y., Hu, Y., Jia, Y., Qi, Y., Li, Y., Zhang, Y., Zhang, Y., Adi, Y., Nam, Y., {Yu},, {Wang},, Zhao, Y., Hao, Y., Qian, Y., Li, Y., He, Y., Rait, Z., DeVito, Z., Rosnbrick, Z., Wen, Z., Yang, Z., Zhao, Z. and Ma, Z., 2024. arXiv [cs.AI]. </li></ol></d-citation-list> <div class="base-grid appendix-entry"> <h3 style="grid-column: 0;">杂项</h3> <p class="author-footnote" style="grid-column: text;"><sup>*</sup>在 Google DeepMind 完成的工作，现就职于 MatX。</p> </div> <div class="base-grid appendix-entry"> <h3 style="grid-column: 0;">引用</h3> <p class="author-footnote">在学术场合引用，请按如下格式：</p> <div class="author-footnote"> <div class="language-bibtex highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code>    <span class="c">Austin et al., "How to Scale Your Model", Google DeepMind, online, 2025.</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> </div> <p class="author-footnote">或使用以下 BibTeX 条目：</p> <div class="author-footnote"> <div class="language-bibtex highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code>    <span class="nc">@article</span><span class="p">{</span><span class="nl">scaling-book</span><span class="p">,</span>
+      <span class="na">title</span> <span class="p">=</span> <span class="s">{How to Scale Your Model}</span><span class="p">,</span>
+      <span class="na">author</span> <span class="p">=</span> <span class="s">{Austin, Jacob and Douglas, Sholto and Frostig, Roy and Levskaya, Anselm and Chen, Charlie and Vikram, Sharad
+      and Lebron, Federico and Choy, Peter and Ramasesh, Vinay and Webson, Albert and Pope, Reiner}</span><span class="p">,</span>
+      <span class="na">publisher</span> <span class="p">=</span> <span class="s">{Google DeepMind}</span><span class="p">,</span>
+      <span class="na">howpublished</span> <span class="p">=</span> <span class="s">{Online}</span><span class="p">,</span>
+      <span class="na">note</span> <span class="p">=</span> <span class="s">{Retrieved from https://jax-ml.github.io/scaling-book/}</span><span class="p">,</span>
+      <span class="na">year</span> <span class="p">=</span> <span class="s">{2025}</span>
+    <span class="p">}</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> </div> </div> </d-appendix> <d-bibliography src="/scaling-book/assets/bibliography/main.bib"></d-bibliography> <div id="giscus_thread" style="max-width: 930px; margin: 0 auto;"> <script>
+      let giscusTheme = determineComputedTheme();
+      let giscusAttributes = {
+        src: 'https://giscus.app/client.js',
+        'data-repo': 'jax-ml/scaling-book',
+        'data-repo-id': '',
+        'data-category': 'General',
+        'data-category-id': '',
+        'data-mapping': 'title',
+        'data-strict': '0',
+        'data-reactions-enabled': '1',
+        'data-emit-metadata': '0',
+        'data-input-position': 'bottom',
+        'data-theme': giscusTheme,
+        'data-loading': '1',
+        'data-lang': 'en',
+        crossorigin: 'anonymous',
+        async: '',
+      };
+
+      let giscusScript = document.createElement('script');
+      Object.entries(giscusAttributes).forEach(([key, value]) => giscusScript.setAttribute(key, value));
+      document.getElementById('giscus_thread').appendChild(giscusScript);
+    </script><script async="" crossorigin="anonymous" data-category="General" data-category-id="" data-emit-metadata="0" data-input-position="bottom" data-lang="en" data-loading="1" data-mapping="title" data-reactions-enabled="1" data-repo="jax-ml/scaling-book" data-repo-id="" data-strict="0" data-theme="light" src="https://giscus.app/client.js"></script><div class="giscus"><iframe allow="clipboard-write" class="giscus-frame giscus-frame--loading" scrolling="no" src="https://giscus.app/en/widget?origin=https%3A%2F%2Fjax-ml.github.io%2Fscaling-book%2Fapplied-training%2F&amp;session=&amp;theme=light&amp;reactionsEnabled=1&amp;emitMetadata=0&amp;inputPosition=bottom&amp;repo=jax-ml%2Fscaling-book&amp;repoId=&amp;category=General&amp;categoryId=&amp;strict=0&amp;description=Let%27s+take+a+close+look+at+how+we%27d+train+LLaMA+3+models+on+TPU+v5p+using+what+we%27ve+learned+in+the+previous+section.+How+big+are+they%3F+How+expensive+is+training+in+different+configurations%3F+How+are+they+sharded%3F+Let%27s+work+through+some+back-of-the-envelope+estimates+for+how+the+previous+sections+map+onto+real+models.&amp;backLink=https%3A%2F%2Fjax-ml.github.io%2Fscaling-book%2Fapplied-training%2F&amp;term=Training+LLaMA+3+on+TPUs+%7C+How+To+Scale+Your+Model" style="opacity: 0;" title="Comments"></iframe></div> <noscript>请启用 JavaScript 以查看由 giscus 驱动的<a href="http://giscus.app/?ref_noscript" rel="external nofollow noopener" target="_blank">评论。</a> </noscript> </div> </div> <footer class="sticky-bottom mt-5" role="contentinfo"> <div class="container"> © 版权所有 2025。由 <a href="https://jekyllrb.com/" rel="external nofollow noopener" target="_blank">Jekyll</a> 强力驱动，使用 <a href="https://github.com/alshedivat/al-folio" rel="external nofollow noopener" target="_blank">al-folio</a> 主题。托管于 <a href="https://pages.github.com/" rel="external nofollow noopener" target="_blank">GitHub Pages</a>。 </div> </footer> <script crossorigin="anonymous" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/bootstrap.bundle.min.js"></script> <script crossorigin="anonymous" integrity="sha256-NdbiivsvWt7VYCt6hYNT3h/th9vSTL4EDWeGs5SN3DA=" src="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/js/mdb.min.js"></script> <script crossorigin="anonymous" defer="" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" src="https://cdn.jsdelivr.net/npm/medium-zoom@1.1.0/dist/medium-zoom.min.js"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/zoom.js?85ddb88934d28b74e78031fd54cf8308"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/no_defer.js?2781658a0a2b13ed609542042a859126"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/common.js?e0514a05c5c95ac1a93a8dfd5249b92e"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/copy_code.js?12775fdf7f95e901d7119054556e495f" type="text/javascript"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/jupyter_new_tab.js?d9f17b6adc2311cbabd747f4538bb15f"></script> <script crossorigin="anonymous" defer="" id="MathJax-script" integrity="sha256-MASABpB4tYktI2Oitl4t+78w/lyA+D7b/s9GEP0JOGI=" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" type="text/javascript"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/mathjax-setup.js?70d799092f862ad98c7876aa47712e20"></script> <script crossorigin="anonymous" defer="" src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/progress-bar.js?2f30e0e6801ea8f5036fa66e1ab0a71a" type="text/javascript"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/vanilla-back-to-top.min.js?f40d453793ff4f64e238e420181a1d17"></script> <script>
+    addBackToTop();
+  </script><div class="hidden" id="back-to-top"><svg viewbox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg></div> <div class="hiddendiv common"></div></body>
+</html>

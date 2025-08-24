@@ -1,0 +1,2426 @@
+<!DOCTYPE html>
+
+<html class="transition" data-theme="light" data-theme-setting="system" lang="zh-CN">
+<head><link href="https://giscus.app/default.css" id="giscus-css" rel="stylesheet"/><style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:20px;margin:11px auto 0;width:20px}#back-to-top.hidden{bottom:-56px;opacity:0}</style> <meta content="text/html; charset=utf-8" http-equiv="Content-Type"/> <meta charset="utf-8"/> <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport"/> <meta content="IE=edge" http-equiv="X-UA-Compatible"/> <title>屋顶线模型详解 | 如何扩展您的模型</title> <meta content=" " name="author"/> <meta content="在硬件上运行算法时，我们会受到三个因素的限制：计算机的算力（OPs/秒）、数据传输可用带宽（字节/秒）以及用于存储数据的总内存容量（字节）。这些“屋顶线”约束使我们能够确定给定计算时间的上限和下限。" name="description"/> <meta content="scaling, jax, llms, transformers, tpus, google, deepmind, parallelism, pallas" name="keywords"/> <link href="https://jax-ml.github.io/scaling-book/assets/css/bootstrap.min.css?a4b3f509e79c54a512b890d73235ef04" rel="stylesheet"/> <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/css/mdb.min.css" integrity="sha256-jpjYvU3G3N6nrrBwXJoVEYI/0zw8htfFnhT9ljN3JJw=" rel="stylesheet"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/academicons.min.css?f0b7046b84e425c55f3463ac249818f5" rel="stylesheet"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/scholar-icons.css?62b2ac103a88034e6882a5be5f3e2772" rel="stylesheet"/> <link defer="" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Roboto+Slab:100,300,400,500,700|Material+Icons&amp;display=swap" rel="stylesheet" type="text/css"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/jekyll-pygments-themes-vs.css?4ee1a2facd1a8a76347f4bd43a740500" id="highlight_theme_light" media="" rel="stylesheet"/> <link href="https://jax-ml.github.io/scaling-book/assets/img/favicon.png?fddbd8c2ec231ba2060e67c85de32a55" rel="shortcut icon"/> <link href="https://jax-ml.github.io/scaling-book/assets/css/main.css?d41d8cd98f00b204e9800998ecf8427e" rel="stylesheet"/> <link href="roofline.html" rel="canonical"/> <style id="distill-prerendered-styles" type="text/css">/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+html {
+  font-size: 14px;
+	line-height: 1.6em;
+  /* font-family: "Libre Franklin", "Helvetica Neue", sans-serif; */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
+  /*, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";*/
+  text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media(min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: #004276;
+}
+
+figure {
+  margin: 0;
+}
+
+table {
+	border-collapse: collapse;
+	border-spacing: 0;
+}
+
+table th {
+	text-align: left;
+}
+
+table thead {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+table thead th {
+  padding-bottom: 0.5em;
+}
+
+table tbody :first-child td {
+  padding-top: 0.5em;
+}
+
+pre {
+  overflow: auto;
+  max-width: 100%;
+}
+
+p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+sup, sub {
+  vertical-align: baseline;
+  position: relative;
+  top: -0.4em;
+  line-height: 1em;
+}
+
+sub {
+  top: 0.4em;
+}
+
+.kicker,
+.marker {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+
+/* Headline */
+
+@media(min-width: 1024px) {
+  d-title h1 span {
+    display: block;
+  }
+}
+
+/* Figure */
+
+figure {
+  position: relative;
+  margin-bottom: 2.5em;
+  margin-top: 1.5em;
+}
+
+figcaption+figure {
+
+}
+
+figure img {
+  width: 100%;
+}
+
+figure svg text,
+figure svg tspan {
+}
+
+figcaption,
+.figcaption {
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 12px;
+  line-height: 1.5em;
+}
+
+@media(min-width: 1024px) {
+figcaption,
+.figcaption {
+    font-size: 13px;
+  }
+}
+
+figure.external img {
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.1);
+  padding: 18px;
+  box-sizing: border-box;
+}
+
+figcaption a {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+figcaption b,
+figcaption strong, {
+  font-weight: 600;
+  color: rgba(0, 0, 0, 1.0);
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@supports not (display: grid) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    display: block;
+    padding: 8px;
+  }
+}
+
+.base-grid,
+distill-header,
+d-title,
+d-abstract,
+d-article,
+d-appendix,
+distill-appendix,
+d-byline,
+d-footnote-list,
+d-citation-list,
+distill-footer {
+  display: grid;
+  justify-items: stretch;
+  grid-template-columns: [screen-start] 8px [page-start kicker-start text-start gutter-start middle-start] 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr [text-end page-end gutter-end kicker-end middle-end] 8px [screen-end];
+  grid-column-gap: 8px;
+}
+
+.grid {
+  display: grid;
+  grid-column-gap: 8px;
+}
+
+@media(min-width: 768px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start middle-start text-start] 45px 45px 45px 45px 45px 45px 45px 45px [ kicker-end text-end gutter-start] 45px [middle-end] 45px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 16px;
+  }
+
+  .grid {
+    grid-column-gap: 16px;
+  }
+}
+
+@media(min-width: 1000px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start] 50px [middle-start] 50px [text-start kicker-end] 50px 50px 50px 50px 50px 50px 50px 50px [text-end gutter-start] 50px [middle-end] 50px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 16px;
+  }
+
+  .grid {
+    grid-column-gap: 16px;
+  }
+}
+
+@media(min-width: 1180px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start] 60px [middle-start] 60px [text-start kicker-end] 60px 60px 60px 60px 60px 60px 60px 60px [text-end gutter-start] 60px [middle-end] 60px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 32px;
+  }
+
+  .grid {
+    grid-column-gap: 32px;
+  }
+}
+
+
+
+
+.base-grid {
+  grid-column: screen;
+}
+
+/* .l-body,
+d-article > *  {
+  grid-column: text;
+}
+
+.l-page,
+d-title > *,
+d-figure {
+  grid-column: page;
+} */
+
+.l-gutter {
+  grid-column: gutter;
+}
+
+.l-text,
+.l-body {
+  grid-column: text;
+}
+
+.l-page {
+  grid-column: page;
+}
+
+.l-body-outset {
+  grid-column: middle;
+}
+
+.l-page-outset {
+  grid-column: page;
+}
+
+.l-screen {
+  grid-column: screen;
+}
+
+.l-screen-inset {
+  grid-column: screen;
+  padding-left: 16px;
+  padding-left: 16px;
+}
+
+
+/* Aside */
+
+d-article aside {
+  grid-column: gutter;
+  font-size: 12px;
+  line-height: 1.6em;
+  color: rgba(0, 0, 0, 0.6)
+}
+
+@media(min-width: 768px) {
+  aside {
+    grid-column: gutter;
+  }
+
+  .side {
+    grid-column: gutter;
+  }
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-title {
+  padding: 2rem 0 1.5rem;
+  contain: layout style;
+  overflow-x: hidden;
+}
+
+@media(min-width: 768px) {
+  d-title {
+    padding: 4rem 0 1.5rem;
+  }
+}
+
+d-title h1 {
+  grid-column: text;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.1em;
+  margin: 0 0 0.5rem;
+}
+
+@media(min-width: 768px) {
+  d-title h1 {
+    font-size: 50px;
+  }
+}
+
+d-title p {
+  font-weight: 300;
+  font-size: 1.2rem;
+  line-height: 1.55em;
+  grid-column: text;
+}
+
+d-title .status {
+  margin-top: 0px;
+  font-size: 12px;
+  color: #009688;
+  opacity: 0.8;
+  grid-column: kicker;
+}
+
+d-title .status span {
+  line-height: 1;
+  display: inline-block;
+  padding: 6px 0;
+  border-bottom: 1px solid #80cbc4;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-byline {
+  contain: style;
+  overflow: hidden;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  font-size: 0.8rem;
+  line-height: 1.8em;
+  padding: 1.5rem 0;
+  min-height: 1.8em;
+}
+
+
+d-byline .byline {
+  grid-template-columns: 1fr 1fr;
+  grid-column: text;
+}
+
+@media(min-width: 768px) {
+  d-byline .byline {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+  }
+}
+
+d-byline .authors-affiliations {
+  grid-column-end: span 3;
+  grid-template-columns: 1fr 1fr 1fr;
+  margin-bottom: 1em;
+}
+
+@media(min-width: 768px) {
+  d-byline .authors-affiliations {
+    margin-bottom: 0;
+  }
+}
+
+d-byline h3 {
+  font-size: 0.6rem;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.5);
+  margin: 0;
+  text-transform: uppercase;
+}
+
+d-byline p {
+  margin: 0;
+}
+
+d-byline a,
+d-article d-byline a {
+  color: rgba(0, 0, 0, 0.8);
+  text-decoration: none;
+  border-bottom: none;
+}
+
+d-article d-byline a:hover {
+  text-decoration: underline;
+  border-bottom: none;
+}
+
+d-byline p.author {
+  font-weight: 500;
+}
+
+d-byline .affiliations {
+
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-article {
+  contain: layout style;
+ border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding-top: 2rem;
+  color: rgba(0, 0, 0, 0.8);
+}
+
+d-article > * {
+  grid-column: text;
+}
+
+@media(min-width: 768px) {
+  d-article {
+    font-size: 16px;
+  }
+}
+
+@media(min-width: 1024px) {
+  d-article {
+    font-size: 1.06rem;
+    line-height: 1.7em;
+  }
+}
+
+
+/* H2 */
+
+
+d-article .marker {
+  text-decoration: none;
+  border: none;
+  counter-reset: section;
+  grid-column: kicker;
+  line-height: 1.7em;
+}
+
+d-article .marker:hover {
+  border: none;
+}
+
+d-article .marker span {
+  padding: 0 3px 4px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  position: relative;
+  top: 4px;
+}
+
+d-article .marker:hover span {
+  color: rgba(0, 0, 0, 0.7);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.7);
+}
+
+d-article h2 {
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 1.25em;
+  margin: 2rem 0 1.5rem 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  padding-bottom: 1rem;
+}
+
+@media(min-width: 1024px) {
+  d-article h2 {
+    font-size: 36px;
+  }
+}
+
+/* H3 */
+
+d-article h3 {
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.4em;
+  margin-bottom: 1em;
+  margin-top: 2em;
+}
+
+@media(min-width: 1024px) {
+  d-article h3 {
+    font-size: 20px;
+  }
+}
+
+/* H4 */
+
+d-article h4 {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 14px;
+  line-height: 1.4em;
+}
+
+d-article a {
+  color: inherit;
+}
+
+d-article p,
+d-article ul,
+d-article ol,
+d-article blockquote {
+  margin-top: 0;
+  margin-bottom: 1em;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+d-article blockquote {
+  border-left: 2px solid rgba(0, 0, 0, 0.2);
+  padding-left: 2em;
+  font-style: italic;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+d-article a {
+  border-bottom: 1px solid var(--global-underline-color);
+  text-decoration: none;
+}
+
+d-article a:hover {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.8);
+}
+
+d-article .link {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+d-article ul,
+d-article ol {
+  padding-left: 24px;
+}
+
+d-article li {
+  margin-bottom: 1em;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+d-article li:last-child {
+  margin-bottom: 0;
+}
+
+d-article pre {
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+d-article hr {
+  grid-column: screen;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  margin-top: 60px;
+  margin-bottom: 60px;
+}
+
+d-article section {
+  margin-top: 60px;
+  margin-bottom: 60px;
+}
+
+d-article span.equation-mimic {
+  font-family: georgia;
+  font-size: 115%;
+  font-style: italic;
+}
+
+d-article > d-code,
+d-article section > d-code  {
+  display: block;
+}
+
+d-article > d-math[block],
+d-article section > d-math[block]  {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  d-article > d-code,
+  d-article section > d-code,
+  d-article > d-math[block],
+  d-article section > d-math[block] {
+      overflow-x: scroll;
+      -ms-overflow-style: none;  // IE 10+
+      overflow: -moz-scrollbars-none;  // Firefox
+  }
+
+  d-article > d-code::-webkit-scrollbar,
+  d-article section > d-code::-webkit-scrollbar,
+  d-article > d-math[block]::-webkit-scrollbar,
+  d-article section > d-math[block]::-webkit-scrollbar {
+    display: none;  // Safari and Chrome
+  }
+}
+
+d-article .citation {
+  color: #668;
+  cursor: pointer;
+}
+
+d-include {
+  width: auto;
+  display: block;
+}
+
+d-figure {
+  contain: layout style;
+}
+
+/* KaTeX */
+
+.katex, .katex-prerendered {
+  contain: style;
+  display: inline-block;
+}
+
+/* Tables */
+
+d-article table {
+  border-collapse: collapse;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+d-article table th {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+d-article table td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+d-article table tr:last-of-type td {
+  border-bottom: none;
+}
+
+d-article table th,
+d-article table td {
+  font-size: 15px;
+  padding: 2px 8px;
+}
+
+d-article table tbody :first-child td {
+  padding-top: 2px;
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+span.katex-display {
+  text-align: left;
+  padding: 8px 0 8px 0;
+  margin: 0.5em 0 0.5em 1em;
+}
+
+span.katex {
+  -webkit-font-smoothing: antialiased;
+;
+  font-size: 1.18em;
+}
+
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@media print {
+
+  @page {
+    size: 8in 11in;
+    @bottom-right {
+      content: counter(page) " of " counter(pages);
+    }
+  }
+
+  html {
+    /* no general margins -- CSS Grid takes care of those */
+  }
+
+  p, code {
+    page-break-inside: avoid;
+  }
+
+  h2, h3 {
+    page-break-after: avoid;
+  }
+
+  d-header {
+    visibility: hidden;
+  }
+
+  d-footer {
+    display: none!important;
+  }
+
+}
+</style><script src="https://jax-ml.github.io/scaling-book/assets/js/theme.js?9a0c749ec5240d9cda97bc72359a72c0"></script> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/jekyll-pygments-themes-native.css?5847e5ed4a4568527aa6cfab446049ca" id="highlight_theme_dark" media="none" rel="stylesheet"/> <script>
+    initTheme();
+  </script> <script src="https://jax-ml.github.io/scaling-book/assets/js/distillpub/template.v2.js"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/distillpub/transforms.v2.js"></script> <style type="text/css">{{page._styles}}</style> <style type="text/css">/* Chart.js */
+@-webkit-keyframes chartjs-render-animation{from{opacity:0.99}to{opacity:1}}@keyframes chartjs-render-animation{from{opacity:0.99}to{opacity:1}}.chartjs-render-monitor{-webkit-animation:chartjs-render-animation 0.001s;animation:chartjs-render-animation 0.001s;}</style><style type="text/css">.medium-zoom-overlay{position:fixed;top:0;right:0;bottom:0;left:0;opacity:0;transition:opacity .3s;will-change:opacity}.medium-zoom--opened .medium-zoom-overlay{cursor:pointer;cursor:zoom-out;opacity:1}.medium-zoom-image{cursor:pointer;cursor:zoom-in;transition:transform .3s cubic-bezier(.2,0,.2,1)!important}.medium-zoom-image--hidden{visibility:hidden}.medium-zoom-image--opened{position:relative;cursor:pointer;cursor:zoom-out;will-change:transform}</style><style type="text/css">.CtxtMenu_InfoClose {  top:.2em; right:.2em;}
+.CtxtMenu_InfoContent {  overflow:auto; text-align:left; font-size:80%;  padding:.4em .6em; border:1px inset; margin:1em 0px;  max-height:20em; max-width:30em; background-color:#EEEEEE;  white-space:normal;}
+.CtxtMenu_Info.CtxtMenu_MousePost {outline:none;}
+.CtxtMenu_Info {  position:fixed; left:50%; width:auto; text-align:center;  border:3px outset; padding:1em 2em; background-color:#DDDDDD;  color:black;  cursor:default; font-family:message-box; font-size:120%;  font-style:normal; text-indent:0; text-transform:none;  line-height:normal; letter-spacing:normal; word-spacing:normal;  word-wrap:normal; white-space:nowrap; float:none; z-index:201;  border-radius: 15px;                     /* Opera 10.5 and IE9 */  -webkit-border-radius:15px;               /* Safari and Chrome */  -moz-border-radius:15px;                  /* Firefox */  -khtml-border-radius:15px;                /* Konqueror */  box-shadow:0px 10px 20px #808080;         /* Opera 10.5 and IE9 */  -webkit-box-shadow:0px 10px 20px #808080; /* Safari 3 & Chrome */  -moz-box-shadow:0px 10px 20px #808080;    /* Forefox 3.5 */  -khtml-box-shadow:0px 10px 20px #808080;  /* Konqueror */  filter:progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color="gray", Positive="true"); /* IE */}
+</style><style type="text/css">.CtxtMenu_MenuClose {  position:absolute;  cursor:pointer;  display:inline-block;  border:2px solid #AAA;  border-radius:18px;  -webkit-border-radius: 18px;             /* Safari and Chrome */  -moz-border-radius: 18px;                /* Firefox */  -khtml-border-radius: 18px;              /* Konqueror */  font-family: "Courier New", Courier;  font-size:24px;  color:#F0F0F0}
+.CtxtMenu_MenuClose span {  display:block; background-color:#AAA; border:1.5px solid;  border-radius:18px;  -webkit-border-radius: 18px;             /* Safari and Chrome */  -moz-border-radius: 18px;                /* Firefox */  -khtml-border-radius: 18px;              /* Konqueror */  line-height:0;  padding:8px 0 6px     /* may need to be browser-specific */}
+.CtxtMenu_MenuClose:hover {  color:white!important;  border:2px solid #CCC!important}
+.CtxtMenu_MenuClose:hover span {  background-color:#CCC!important}
+.CtxtMenu_MenuClose:hover:focus {  outline:none}
+</style><style type="text/css">.CtxtMenu_Menu {  position:absolute;  background-color:white;  color:black;  width:auto; padding:5px 0px;  border:1px solid #CCCCCC; margin:0; cursor:default;  font: menu; text-align:left; text-indent:0; text-transform:none;  line-height:normal; letter-spacing:normal; word-spacing:normal;  word-wrap:normal; white-space:nowrap; float:none; z-index:201;  border-radius: 5px;                     /* Opera 10.5 and IE9 */  -webkit-border-radius: 5px;             /* Safari and Chrome */  -moz-border-radius: 5px;                /* Firefox */  -khtml-border-radius: 5px;              /* Konqueror */  box-shadow:0px 10px 20px #808080;         /* Opera 10.5 and IE9 */  -webkit-box-shadow:0px 10px 20px #808080; /* Safari 3 & Chrome */  -moz-box-shadow:0px 10px 20px #808080;    /* Forefox 3.5 */  -khtml-box-shadow:0px 10px 20px #808080;  /* Konqueror */}
+.CtxtMenu_MenuItem {  padding: 1px 2em;  background:transparent;}
+.CtxtMenu_MenuArrow {  position:absolute; right:.5em; padding-top:.25em; color:#666666;  font-family: null; font-size: .75em}
+.CtxtMenu_MenuActive .CtxtMenu_MenuArrow {color:white}
+.CtxtMenu_MenuArrow.CtxtMenu_RTL {left:.5em; right:auto}
+.CtxtMenu_MenuCheck {  position:absolute; left:.7em;  font-family: null}
+.CtxtMenu_MenuCheck.CtxtMenu_RTL { right:.7em; left:auto }
+.CtxtMenu_MenuRadioCheck {  position:absolute; left: .7em;}
+.CtxtMenu_MenuRadioCheck.CtxtMenu_RTL {  right: .7em; left:auto}
+.CtxtMenu_MenuInputBox {  padding-left: 1em; right:.5em; color:#666666;  font-family: null;}
+.CtxtMenu_MenuInputBox.CtxtMenu_RTL {  left: .1em;}
+.CtxtMenu_MenuComboBox {  left:.1em; padding-bottom:.5em;}
+.CtxtMenu_MenuSlider {  left: .1em;}
+.CtxtMenu_SliderValue {  position:absolute; right:.1em; padding-top:.25em; color:#333333;  font-size: .75em}
+.CtxtMenu_SliderBar {  outline: none; background: #d3d3d3}
+.CtxtMenu_MenuLabel {  padding: 1px 2em 3px 1.33em;  font-style:italic}
+.CtxtMenu_MenuRule {  border-top: 1px solid #DDDDDD;  margin: 4px 3px;}
+.CtxtMenu_MenuDisabled {  color:GrayText}
+.CtxtMenu_MenuActive {  background-color: #606872;  color: white;}
+.CtxtMenu_MenuDisabled:focus {  background-color: #E8E8E8}
+.CtxtMenu_MenuLabel:focus {  background-color: #E8E8E8}
+.CtxtMenu_ContextMenu:focus {  outline:none}
+.CtxtMenu_ContextMenu .CtxtMenu_MenuItem:focus {  outline:none}
+.CtxtMenu_SelectionMenu {  position:relative; float:left;  border-bottom: none; -webkit-box-shadow:none; -webkit-border-radius:0px; }
+.CtxtMenu_SelectionItem {  padding-right: 1em;}
+.CtxtMenu_Selection {  right: 40%; width:50%; }
+.CtxtMenu_SelectionBox {  padding: 0em; max-height:20em; max-width: none;  background-color:#FFFFFF;}
+.CtxtMenu_SelectionDivider {  clear: both; border-top: 2px solid #000000;}
+.CtxtMenu_Menu .CtxtMenu_MenuClose {  top:-10px; left:-10px}
+</style><style id="MJX-CHTML-styles">
+mjx-container[jax="CHTML"] {
+  line-height: 0;
+}
+
+mjx-container [space="1"] {
+  margin-left: .111em;
+}
+
+mjx-container [space="2"] {
+  margin-left: .167em;
+}
+
+mjx-container [space="3"] {
+  margin-left: .222em;
+}
+
+mjx-container [space="4"] {
+  margin-left: .278em;
+}
+
+mjx-container [space="5"] {
+  margin-left: .333em;
+}
+
+mjx-container [rspace="1"] {
+  margin-right: .111em;
+}
+
+mjx-container [rspace="2"] {
+  margin-right: .167em;
+}
+
+mjx-container [rspace="3"] {
+  margin-right: .222em;
+}
+
+mjx-container [rspace="4"] {
+  margin-right: .278em;
+}
+
+mjx-container [rspace="5"] {
+  margin-right: .333em;
+}
+
+mjx-container [size="s"] {
+  font-size: 70.7%;
+}
+
+mjx-container [size="ss"] {
+  font-size: 50%;
+}
+
+mjx-container [size="Tn"] {
+  font-size: 60%;
+}
+
+mjx-container [size="sm"] {
+  font-size: 85%;
+}
+
+mjx-container [size="lg"] {
+  font-size: 120%;
+}
+
+mjx-container [size="Lg"] {
+  font-size: 144%;
+}
+
+mjx-container [size="LG"] {
+  font-size: 173%;
+}
+
+mjx-container [size="hg"] {
+  font-size: 207%;
+}
+
+mjx-container [size="HG"] {
+  font-size: 249%;
+}
+
+mjx-container [width="full"] {
+  width: 100%;
+}
+
+mjx-box {
+  display: inline-block;
+}
+
+mjx-block {
+  display: block;
+}
+
+mjx-itable {
+  display: inline-table;
+}
+
+mjx-row {
+  display: table-row;
+}
+
+mjx-row > * {
+  display: table-cell;
+}
+
+mjx-mtext {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-mstyle {
+  display: inline-block;
+}
+
+mjx-merror {
+  display: inline-block;
+  color: red;
+  background-color: yellow;
+}
+
+mjx-mphantom {
+  visibility: hidden;
+}
+
+_::-webkit-full-page-media, _:future, :root mjx-container {
+  will-change: opacity;
+}
+
+mjx-assistive-mml {
+  position: absolute !important;
+  top: 0px;
+  left: 0px;
+  clip: rect(1px, 1px, 1px, 1px);
+  padding: 1px 0px 0px 0px !important;
+  border: 0px !important;
+  display: block !important;
+  width: auto !important;
+  overflow: hidden !important;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+mjx-assistive-mml[display="block"] {
+  width: 100% !important;
+}
+
+mjx-math {
+  display: inline-block;
+  text-align: left;
+  line-height: 0;
+  text-indent: 0;
+  font-style: normal;
+  font-weight: normal;
+  font-size: 100%;
+  font-size-adjust: none;
+  letter-spacing: normal;
+  border-collapse: collapse;
+  word-wrap: normal;
+  word-spacing: normal;
+  white-space: nowrap;
+  direction: ltr;
+  padding: 1px 0;
+}
+
+mjx-container[jax="CHTML"][display="true"] {
+  display: block;
+  text-align: center;
+  margin: 1em 0;
+}
+
+mjx-container[jax="CHTML"][display="true"][width="full"] {
+  display: flex;
+}
+
+mjx-container[jax="CHTML"][display="true"] mjx-math {
+  padding: 0;
+}
+
+mjx-container[jax="CHTML"][justify="left"] {
+  text-align: left;
+}
+
+mjx-container[jax="CHTML"][justify="right"] {
+  text-align: right;
+}
+
+mjx-mtable {
+  display: inline-block;
+  text-align: center;
+  vertical-align: .25em;
+  position: relative;
+  box-sizing: border-box;
+  border-spacing: 0;
+  border-collapse: collapse;
+}
+
+mjx-mstyle[size="s"] mjx-mtable {
+  vertical-align: .354em;
+}
+
+mjx-labels {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+mjx-table {
+  display: inline-block;
+  vertical-align: -.5ex;
+  box-sizing: border-box;
+}
+
+mjx-table > mjx-itable {
+  vertical-align: middle;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+mjx-labels > mjx-itable {
+  position: absolute;
+  top: 0;
+}
+
+mjx-mtable[justify="left"] {
+  text-align: left;
+}
+
+mjx-mtable[justify="right"] {
+  text-align: right;
+}
+
+mjx-mtable[justify="left"][side="left"] {
+  padding-right: 0 ! important;
+}
+
+mjx-mtable[justify="left"][side="right"] {
+  padding-left: 0 ! important;
+}
+
+mjx-mtable[justify="right"][side="left"] {
+  padding-right: 0 ! important;
+}
+
+mjx-mtable[justify="right"][side="right"] {
+  padding-left: 0 ! important;
+}
+
+mjx-mtable[align] {
+  vertical-align: baseline;
+}
+
+mjx-mtable[align="top"] > mjx-table {
+  vertical-align: top;
+}
+
+mjx-mtable[align="bottom"] > mjx-table {
+  vertical-align: bottom;
+}
+
+mjx-mtable[side="right"] mjx-labels {
+  min-width: 100%;
+}
+
+mjx-mlabeledtr {
+  display: table-row;
+  text-align: left;
+}
+
+mjx-mlabeledtr[rowalign="top"] > mjx-mtd {
+  vertical-align: top;
+}
+
+mjx-mlabeledtr[rowalign="center"] > mjx-mtd {
+  vertical-align: middle;
+}
+
+mjx-mlabeledtr[rowalign="bottom"] > mjx-mtd {
+  vertical-align: bottom;
+}
+
+mjx-mlabeledtr[rowalign="baseline"] > mjx-mtd {
+  vertical-align: baseline;
+}
+
+mjx-mlabeledtr[rowalign="axis"] > mjx-mtd {
+  vertical-align: .25em;
+}
+
+mjx-mtr {
+  display: table-row;
+  text-align: left;
+}
+
+mjx-mtr[rowalign="top"] > mjx-mtd {
+  vertical-align: top;
+}
+
+mjx-mtr[rowalign="center"] > mjx-mtd {
+  vertical-align: middle;
+}
+
+mjx-mtr[rowalign="bottom"] > mjx-mtd {
+  vertical-align: bottom;
+}
+
+mjx-mtr[rowalign="baseline"] > mjx-mtd {
+  vertical-align: baseline;
+}
+
+mjx-mtr[rowalign="axis"] > mjx-mtd {
+  vertical-align: .25em;
+}
+
+mjx-mtd {
+  display: table-cell;
+  text-align: center;
+  padding: .215em .4em;
+}
+
+mjx-mtd:first-child {
+  padding-left: 0;
+}
+
+mjx-mtd:last-child {
+  padding-right: 0;
+}
+
+mjx-mtable > * > mjx-itable > *:first-child > mjx-mtd {
+  padding-top: 0;
+}
+
+mjx-mtable > * > mjx-itable > *:last-child > mjx-mtd {
+  padding-bottom: 0;
+}
+
+mjx-tstrut {
+  display: inline-block;
+  height: 1em;
+  vertical-align: -.25em;
+}
+
+mjx-labels[align="left"] > mjx-mtr > mjx-mtd {
+  text-align: left;
+}
+
+mjx-labels[align="right"] > mjx-mtr > mjx-mtd {
+  text-align: right;
+}
+
+mjx-mtd[extra] {
+  padding: 0;
+}
+
+mjx-mtd[rowalign="top"] {
+  vertical-align: top;
+}
+
+mjx-mtd[rowalign="center"] {
+  vertical-align: middle;
+}
+
+mjx-mtd[rowalign="bottom"] {
+  vertical-align: bottom;
+}
+
+mjx-mtd[rowalign="baseline"] {
+  vertical-align: baseline;
+}
+
+mjx-mtd[rowalign="axis"] {
+  vertical-align: .25em;
+}
+
+mjx-c {
+  display: inline-block;
+}
+
+mjx-utext {
+  display: inline-block;
+  padding: .75em 0 .2em 0;
+}
+
+mjx-msub {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-mi {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-mo {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-stretchy-h {
+  display: inline-table;
+  width: 100%;
+}
+
+mjx-stretchy-h > * {
+  display: table-cell;
+  width: 0;
+}
+
+mjx-stretchy-h > * > mjx-c {
+  display: inline-block;
+  transform: scalex(1.0000001);
+}
+
+mjx-stretchy-h > * > mjx-c::before {
+  display: inline-block;
+  width: initial;
+}
+
+mjx-stretchy-h > mjx-ext {
+  /* IE */ overflow: hidden;
+  /* others */ overflow: clip visible;
+  width: 100%;
+}
+
+mjx-stretchy-h > mjx-ext > mjx-c::before {
+  transform: scalex(500);
+}
+
+mjx-stretchy-h > mjx-ext > mjx-c {
+  width: 0;
+}
+
+mjx-stretchy-h > mjx-beg > mjx-c {
+  margin-right: -.1em;
+}
+
+mjx-stretchy-h > mjx-end > mjx-c {
+  margin-left: -.1em;
+}
+
+mjx-stretchy-v {
+  display: inline-block;
+}
+
+mjx-stretchy-v > * {
+  display: block;
+}
+
+mjx-stretchy-v > mjx-beg {
+  height: 0;
+}
+
+mjx-stretchy-v > mjx-end > mjx-c {
+  display: block;
+}
+
+mjx-stretchy-v > * > mjx-c {
+  transform: scaley(1.0000001);
+  transform-origin: left center;
+  overflow: hidden;
+}
+
+mjx-stretchy-v > mjx-ext {
+  display: block;
+  height: 100%;
+  box-sizing: border-box;
+  border: 0px solid transparent;
+  /* IE */ overflow: hidden;
+  /* others */ overflow: visible clip;
+}
+
+mjx-stretchy-v > mjx-ext > mjx-c::before {
+  width: initial;
+  box-sizing: border-box;
+}
+
+mjx-stretchy-v > mjx-ext > mjx-c {
+  transform: scaleY(500) translateY(.075em);
+  overflow: visible;
+}
+
+mjx-mark {
+  display: inline-block;
+  height: 0px;
+}
+
+mjx-mfrac {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-frac {
+  display: inline-block;
+  vertical-align: 0.17em;
+  padding: 0 .22em;
+}
+
+mjx-frac[type="d"] {
+  vertical-align: .04em;
+}
+
+mjx-frac[delims] {
+  padding: 0 .1em;
+}
+
+mjx-frac[atop] {
+  padding: 0 .12em;
+}
+
+mjx-frac[atop][delims] {
+  padding: 0;
+}
+
+mjx-dtable {
+  display: inline-table;
+  width: 100%;
+}
+
+mjx-dtable > * {
+  font-size: 2000%;
+}
+
+mjx-dbox {
+  display: block;
+  font-size: 5%;
+}
+
+mjx-num {
+  display: block;
+  text-align: center;
+}
+
+mjx-den {
+  display: block;
+  text-align: center;
+}
+
+mjx-mfrac[bevelled] > mjx-num {
+  display: inline-block;
+}
+
+mjx-mfrac[bevelled] > mjx-den {
+  display: inline-block;
+}
+
+mjx-den[align="right"], mjx-num[align="right"] {
+  text-align: right;
+}
+
+mjx-den[align="left"], mjx-num[align="left"] {
+  text-align: left;
+}
+
+mjx-nstrut {
+  display: inline-block;
+  height: .054em;
+  width: 0;
+  vertical-align: -.054em;
+}
+
+mjx-nstrut[type="d"] {
+  height: .217em;
+  vertical-align: -.217em;
+}
+
+mjx-dstrut {
+  display: inline-block;
+  height: .505em;
+  width: 0;
+}
+
+mjx-dstrut[type="d"] {
+  height: .726em;
+}
+
+mjx-line {
+  display: block;
+  box-sizing: border-box;
+  min-height: 1px;
+  height: .06em;
+  border-top: .06em solid;
+  margin: .06em -.1em;
+  overflow: hidden;
+}
+
+mjx-line[type="d"] {
+  margin: .18em -.1em;
+}
+
+mjx-mrow {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-mn {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-mspace {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-TeXAtom {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-c::before {
+  display: block;
+  width: 0;
+}
+
+.MJX-TEX {
+  font-family: MJXZERO, MJXTEX;
+}
+
+.TEX-B {
+  font-family: MJXZERO, MJXTEX-B;
+}
+
+.TEX-I {
+  font-family: MJXZERO, MJXTEX-I;
+}
+
+.TEX-MI {
+  font-family: MJXZERO, MJXTEX-MI;
+}
+
+.TEX-BI {
+  font-family: MJXZERO, MJXTEX-BI;
+}
+
+.TEX-S1 {
+  font-family: MJXZERO, MJXTEX-S1;
+}
+
+.TEX-S2 {
+  font-family: MJXZERO, MJXTEX-S2;
+}
+
+.TEX-S3 {
+  font-family: MJXZERO, MJXTEX-S3;
+}
+
+.TEX-S4 {
+  font-family: MJXZERO, MJXTEX-S4;
+}
+
+.TEX-A {
+  font-family: MJXZERO, MJXTEX-A;
+}
+
+.TEX-C {
+  font-family: MJXZERO, MJXTEX-C;
+}
+
+.TEX-CB {
+  font-family: MJXZERO, MJXTEX-CB;
+}
+
+.TEX-FR {
+  font-family: MJXZERO, MJXTEX-FR;
+}
+
+.TEX-FRB {
+  font-family: MJXZERO, MJXTEX-FRB;
+}
+
+.TEX-SS {
+  font-family: MJXZERO, MJXTEX-SS;
+}
+
+.TEX-SSB {
+  font-family: MJXZERO, MJXTEX-SSB;
+}
+
+.TEX-SSI {
+  font-family: MJXZERO, MJXTEX-SSI;
+}
+
+.TEX-SC {
+  font-family: MJXZERO, MJXTEX-SC;
+}
+
+.TEX-T {
+  font-family: MJXZERO, MJXTEX-T;
+}
+
+.TEX-V {
+  font-family: MJXZERO, MJXTEX-V;
+}
+
+.TEX-VB {
+  font-family: MJXZERO, MJXTEX-VB;
+}
+
+mjx-stretchy-v mjx-c, mjx-stretchy-h mjx-c {
+  font-family: MJXZERO, MJXTEX-S1, MJXTEX-S4, MJXTEX, MJXTEX-A ! important;
+}
+
+@font-face /* 0 */ {
+  font-family: MJXZERO;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Zero.woff") format("woff");
+}
+
+@font-face /* 1 */ {
+  font-family: MJXTEX;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Main-Regular.woff") format("woff");
+}
+
+@font-face /* 2 */ {
+  font-family: MJXTEX-B;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Main-Bold.woff") format("woff");
+}
+
+@font-face /* 3 */ {
+  font-family: MJXTEX-I;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Math-Italic.woff") format("woff");
+}
+
+@font-face /* 4 */ {
+  font-family: MJXTEX-MI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Main-Italic.woff") format("woff");
+}
+
+@font-face /* 5 */ {
+  font-family: MJXTEX-BI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Math-BoldItalic.woff") format("woff");
+}
+
+@font-face /* 6 */ {
+  font-family: MJXTEX-S1;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size1-Regular.woff") format("woff");
+}
+
+@font-face /* 7 */ {
+  font-family: MJXTEX-S2;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size2-Regular.woff") format("woff");
+}
+
+@font-face /* 8 */ {
+  font-family: MJXTEX-S3;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size3-Regular.woff") format("woff");
+}
+
+@font-face /* 9 */ {
+  font-family: MJXTEX-S4;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size4-Regular.woff") format("woff");
+}
+
+@font-face /* 10 */ {
+  font-family: MJXTEX-A;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_AMS-Regular.woff") format("woff");
+}
+
+@font-face /* 11 */ {
+  font-family: MJXTEX-C;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Calligraphic-Regular.woff") format("woff");
+}
+
+@font-face /* 12 */ {
+  font-family: MJXTEX-CB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Calligraphic-Bold.woff") format("woff");
+}
+
+@font-face /* 13 */ {
+  font-family: MJXTEX-FR;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Fraktur-Regular.woff") format("woff");
+}
+
+@font-face /* 14 */ {
+  font-family: MJXTEX-FRB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Fraktur-Bold.woff") format("woff");
+}
+
+@font-face /* 15 */ {
+  font-family: MJXTEX-SS;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Regular.woff") format("woff");
+}
+
+@font-face /* 16 */ {
+  font-family: MJXTEX-SSB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Bold.woff") format("woff");
+}
+
+@font-face /* 17 */ {
+  font-family: MJXTEX-SSI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Italic.woff") format("woff");
+}
+
+@font-face /* 18 */ {
+  font-family: MJXTEX-SC;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Script-Regular.woff") format("woff");
+}
+
+@font-face /* 19 */ {
+  font-family: MJXTEX-T;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Typewriter-Regular.woff") format("woff");
+}
+
+@font-face /* 20 */ {
+  font-family: MJXTEX-V;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Vector-Regular.woff") format("woff");
+}
+
+@font-face /* 21 */ {
+  font-family: MJXTEX-VB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Vector-Bold.woff") format("woff");
+}
+
+mjx-c.mjx-c28::before {
+  padding: 0.75em 0.389em 0.25em 0;
+  content: "(";
+}
+
+mjx-c.mjx-c31::before {
+  padding: 0.666em 0.5em 0 0;
+  content: "1";
+}
+
+mjx-c.mjx-c29::before {
+  padding: 0.75em 0.389em 0.25em 0;
+  content: ")";
+}
+
+mjx-c.mjx-c1D447.TEX-I::before {
+  padding: 0.677em 0.704em 0 0;
+  content: "T";
+}
+
+mjx-c.mjx-c6D::before {
+  padding: 0.442em 0.833em 0 0;
+  content: "m";
+}
+
+mjx-c.mjx-c61::before {
+  padding: 0.448em 0.5em 0.011em 0;
+  content: "a";
+}
+
+mjx-c.mjx-c74::before {
+  padding: 0.615em 0.389em 0.01em 0;
+  content: "t";
+}
+
+mjx-c.mjx-c68::before {
+  padding: 0.694em 0.556em 0 0;
+  content: "h";
+}
+
+mjx-c.mjx-c3D::before {
+  padding: 0.583em 0.778em 0.082em 0;
+  content: "=";
+}
+
+mjx-c.mjx-c43::before {
+  padding: 0.705em 0.722em 0.021em 0;
+  content: "C";
+}
+
+mjx-c.mjx-c6F::before {
+  padding: 0.448em 0.5em 0.01em 0;
+  content: "o";
+}
+
+mjx-c.mjx-c70::before {
+  padding: 0.442em 0.556em 0.194em 0;
+  content: "p";
+}
+
+mjx-c.mjx-c75::before {
+  padding: 0.442em 0.556em 0.011em 0;
+  content: "u";
+}
+
+mjx-c.mjx-c69::before {
+  padding: 0.669em 0.278em 0 0;
+  content: "i";
+}
+
+mjx-c.mjx-c6E::before {
+  padding: 0.442em 0.556em 0 0;
+  content: "n";
+}
+
+mjx-c.mjx-c20::before {
+  padding: 0 0.25em 0 0;
+  content: " ";
+}
+
+mjx-c.mjx-c46::before {
+  padding: 0.68em 0.653em 0 0;
+  content: "F";
+}
+
+mjx-c.mjx-c4C::before {
+  padding: 0.683em 0.625em 0 0;
+  content: "L";
+}
+
+mjx-c.mjx-c4F::before {
+  padding: 0.705em 0.778em 0.022em 0;
+  content: "O";
+}
+
+mjx-c.mjx-c50::before {
+  padding: 0.683em 0.681em 0 0;
+  content: "P";
+}
+
+mjx-c.mjx-c73::before {
+  padding: 0.448em 0.394em 0.011em 0;
+  content: "s";
+}
+
+mjx-c.mjx-c41::before {
+  padding: 0.716em 0.75em 0 0;
+  content: "A";
+}
+
+mjx-c.mjx-c63::before {
+  padding: 0.448em 0.444em 0.011em 0;
+  content: "c";
+}
+
+mjx-c.mjx-c65::before {
+  padding: 0.448em 0.444em 0.011em 0;
+  content: "e";
+}
+
+mjx-c.mjx-c6C::before {
+  padding: 0.694em 0.278em 0 0;
+  content: "l";
+}
+
+mjx-c.mjx-c72::before {
+  padding: 0.442em 0.392em 0 0;
+  content: "r";
+}
+
+mjx-c.mjx-c2F::before {
+  padding: 0.75em 0.5em 0.25em 0;
+  content: "/";
+}
+
+mjx-c.mjx-c32::before {
+  padding: 0.666em 0.5em 0 0;
+  content: "2";
+}
+
+mjx-c.mjx-c42::before {
+  padding: 0.683em 0.708em 0 0;
+  content: "B";
+}
+
+mjx-c.mjx-c79::before {
+  padding: 0.431em 0.528em 0.204em 0;
+  content: "y";
+}
+
+mjx-c.mjx-c4E::before {
+  padding: 0.683em 0.75em 0 0;
+  content: "N";
+}
+
+mjx-c.mjx-c77::before {
+  padding: 0.431em 0.722em 0.011em 0;
+  content: "w";
+}
+
+mjx-c.mjx-c6B::before {
+  padding: 0.694em 0.528em 0 0;
+  content: "k";
+}
+
+mjx-c.mjx-c4D::before {
+  padding: 0.683em 0.917em 0 0;
+  content: "M";
+}
+
+mjx-c.mjx-c64::before {
+  padding: 0.694em 0.556em 0.011em 0;
+  content: "d";
+}
+
+mjx-c.mjx-c33::before {
+  padding: 0.665em 0.5em 0.022em 0;
+  content: "3";
+}
+
+mjx-c.mjx-c78::before {
+  padding: 0.431em 0.528em 0 0;
+  content: "x";
+}
+
+mjx-c.mjx-c2C::before {
+  padding: 0.121em 0.278em 0.194em 0;
+  content: ",";
+}
+
+mjx-c.mjx-c34::before {
+  padding: 0.677em 0.5em 0 0;
+  content: "4";
+}
+
+mjx-c.mjx-c2B::before {
+  padding: 0.583em 0.778em 0.082em 0;
+  content: "+";
+}
+
+mjx-c.mjx-c35::before {
+  padding: 0.666em 0.5em 0.022em 0;
+  content: "5";
+}
+
+mjx-c.mjx-c49::before {
+  padding: 0.683em 0.361em 0 0;
+  content: "I";
+}
+
+mjx-c.mjx-c3E::before {
+  padding: 0.54em 0.778em 0.04em 0;
+  content: ">";
+}
+
+mjx-c.mjx-c21D4::before {
+  padding: 0.526em 1em 0.025em 0;
+  content: "\21D4";
+}
+
+mjx-c.mjx-c36::before {
+  padding: 0.666em 0.5em 0.022em 0;
+  content: "6";
+}
+
+mjx-c.mjx-c54::before {
+  padding: 0.677em 0.722em 0 0;
+  content: "T";
+}
+
+mjx-c.mjx-c1D441.TEX-I::before {
+  padding: 0.683em 0.888em 0 0;
+  content: "N";
+}
+
+mjx-c.mjx-c2212::before {
+  padding: 0.583em 0.778em 0.082em 0;
+  content: "\2212";
+}
+
+mjx-c.mjx-c2192::before {
+  padding: 0.511em 1em 0.011em 0;
+  content: "\2192";
+}
+
+mjx-c.mjx-c37::before {
+  padding: 0.676em 0.5em 0.022em 0;
+  content: "7";
+}
+
+mjx-c.mjx-c1D435.TEX-I::before {
+  padding: 0.683em 0.759em 0 0;
+  content: "B";
+}
+
+mjx-c.mjx-c1D437.TEX-I::before {
+  padding: 0.683em 0.828em 0 0;
+  content: "D";
+}
+
+mjx-c.mjx-c1D439.TEX-I::before {
+  padding: 0.68em 0.749em 0 0;
+  content: "F";
+}
+
+mjx-c.mjx-c38::before {
+  padding: 0.666em 0.5em 0.022em 0;
+  content: "8";
+}
+
+mjx-c.mjx-c224A.TEX-A::before {
+  padding: 0.579em 0.778em 0.039em 0;
+  content: "\224A";
+}
+
+mjx-c.mjx-c39::before {
+  padding: 0.666em 0.5em 0.022em 0;
+  content: "9";
+}
+
+mjx-c.mjx-c55::before {
+  padding: 0.683em 0.75em 0.022em 0;
+  content: "U";
+}
+
+mjx-c.mjx-c27F9::before {
+  padding: 0.525em 1.638em 0.024em 0;
+  content: "\27F9";
+}
+
+mjx-c.mjx-c2E::before {
+  padding: 0.12em 0.278em 0 0;
+  content: ".";
+}
+
+mjx-c.mjx-c1D452.TEX-I::before {
+  padding: 0.442em 0.466em 0.011em 0;
+  content: "e";
+}
+
+mjx-c.mjx-c30::before {
+  padding: 0.666em 0.5em 0.022em 0;
+  content: "0";
+}
+
+mjx-c.mjx-c22C5::before {
+  padding: 0.31em 0.278em 0 0;
+  content: "\22C5";
+}
+
+mjx-c.mjx-c2D::before {
+  padding: 0.252em 0.333em 0 0;
+  content: "-";
+}
+
+mjx-c.mjx-c226A::before {
+  padding: 0.568em 1em 0.067em 0;
+  content: "\226A";
+}
+
+mjx-c.mjx-cD7::before {
+  padding: 0.491em 0.778em 0 0;
+  content: "\D7";
+}
+</style><link crossorigin="anonymous" href="https://distill.pub/third-party/katex/katex.min.css" rel="stylesheet"/><script async="" src="https://distill.pub/third-party/katex/katex.min.js"></script></head>
+<body> <d-front-matter> <script async="" type="text/json">
+      {
+            "title": "关于屋顶线模型的一切",
+            "description": "当我们在硬件上运行算法时，会受到三件事的限制：计算机的数学运算速度（OPs/秒）、移动数据的可用带宽（字节/秒），以及存储数据的总可用内存（字节）。这些“屋顶线”约束使我们能够为一个给定的计算设定时间的上限和下限。",
+            "published": "2025年2月4日",
+            "authors": [
+              
+              {
+                "author": "Jacob Austin",
+                "authorURL": "https://www.jacobaustin.org/",
+                "affiliations": [
+                  {
+                    "name": "Google DeepMind",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Sholto Douglas",
+                "authorURL": "https://x.com/_sholtodouglas",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Roy Frostig",
+                "authorURL": "https://cs.stanford.edu/~rfrostig/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Anselm Levskaya",
+                "authorURL": "https://anselmlevskaya.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Charlie Chen",
+                "authorURL": "https://x.com/charliexychen",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Sharad Vikram",
+                "authorURL": "https://sharadvikram.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Federico Lebron",
+                "authorURL": "https://fedelebron.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Peter Choy",
+                "authorURL": "https://x.com/pchoy95",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Vinay Ramasesh",
+                "authorURL": "https://x.com/vinayramasesh",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Albert Webson",
+                "authorURL": "https://representation.ai/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Reiner Pope<sup>*</sup>",
+                "authorURL": "https://x.com/reinerpope",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              }
+              
+            ],
+            "katex": {
+              "delimiters": [
+                {
+                  "left": "$",
+                  "right": "$",
+                  "display": false
+                },
+                {
+                  "left": "$$",
+                  "right": "$$",
+                  "display": true
+                }
+              ]
+            }
+          }
+    </script> </d-front-matter> <header> <script>
+    function goToTop() {
+      document.body.scrollTop = 0; // For Safari
+      document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+    }
+
+    // When the user scrolls down 20px from the top of the document, show the button
+    window.onscroll = function() {scrollFunction()};
+
+    function scrollFunction() {
+      // Get the button:
+      let mybutton = document.getElementById("top-button");
+
+      if (document.body.scrollTop > 40 || document.documentElement.scrollTop > 40) {
+        mybutton.style.display = "block";
+      } else {
+        mybutton.style.display = "none";
+      }
+  }
+  </script> <nav class="navbar navbar-light navbar-expand-sm fixed-top" id="navbar" role="navigation"> <div class="container"> <a class="navbar-brand title font-weight-lighter" href="scaling-book.html"> 如何扩展你的模型 </a> <button aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler collapsed ml-auto" data-target="#navbarNav" data-toggle="collapse" type="button"> <span class="sr-only">切换导航</span> <span class="icon-bar top-bar"></span> <span class="icon-bar middle-bar"></span> <span class="icon-bar bottom-bar"></span> </button> <div class="left-button section-button"><a href="scaling-book.html"><svg viewbox="-78.5 0 512 512"><path d="M257 64L291 98 128 262 291 426 257 460 61 262 257 64Z"></path></svg></a></div> <div class="right-button section-button"><a href="tpus.html"><svg viewbox="-78.5 0 512 512"><path d="M98 460L64 426 227 262 64 98 98 64 294 262 98 460Z"></path></svg></a></div> <div class="collapse navbar-collapse text-right" id="navbarNav"> <ul class="navbar-nav ml-auto flex-nowrap"> <li class="nav-item"> <a class="nav-link" href="scaling-book.html"> </a> </li> <li class="nav-item nav-hidden"><a class="nav-link" id="top-button" onclick="goToTop()" style="display: none;">返回顶部</a></li> <li class="nav-item nav-hidden"><p class="nav-link"></p></li> <li class="nav-item nav-hidden"><a class="nav-link" href="scaling-book.html">上一部分</a></li> <li class="nav-item nav-hidden"><a class="nav-link" href="tpus.html">下一部分</a></li> <li class="nav-item nav-hidden"><p class="nav-link"></p></li> <li class="nav-item dropdown"> <a aria-expanded="false" aria-haspopup="true" class="nav-link dropdown-toggle" data-toggle="dropdown" href="#" id="navbarDropdown" role="button">章节 </a> <div aria-labelledby="navbarDropdown" class="dropdown-menu dropdown-menu-right"> <a class="dropdown-item" href="https://jax-ml.github.io/scaling-book/index">第 0 部分：引言</a> <a class="dropdown-item" href="roofline.html">第 1 部分：屋顶线模型入门</a> <a class="dropdown-item" href="tpus.html">第 2 部分：关于 TPU 的一切</a> <a class="dropdown-item" href="sharding.html">第 3 部分：分片矩阵乘法</a> <a class="dropdown-item" href="transformers.html">第 4 部分：Transformer</a> <a class="dropdown-item" href="training.html">第 5 部分：训练</a> <a class="dropdown-item" href="applied-training.html">第 6 部分：训练 LLaMA</a> <a class="dropdown-item" href="inference.html">第 7 部分：推理</a> <a class="dropdown-item" href="applied-inference.html">第 8 部分：服务 LLaMA</a> <a class="dropdown-item" href="profiling.html">第 9 部分：性能分析</a> <a class="dropdown-item" href="jax-stuff.html">第 10 部分：关于 JAX 的一切</a> <a class="dropdown-item" href="conclusion.html">第 11 部分：结论</a> <a class="dropdown-item" href="gpus.html">第 12 部分：GPU</a> </div> </li> <li class="toggle-container"> <button id="light-toggle" title="Change theme"> <i class="ti ti-sun-moon" id="light-toggle-system"></i> <i class="ti ti-moon-filled" id="light-toggle-dark"></i> <i class="ti ti-sun-filled" id="light-toggle-light"></i> </button> </li> </ul> </div> </div> </nav> <progress id="progress" value="0"> <div class="progress-container"> <span class="progress-bar"></span> </div> </progress> </header> <div class="post distill"><div class="translation-info base-grid" style="margin-bottom: 20px;">
+<div style="grid-column: text;
+                       display: flex;
+                       align-items: center;
+                       justify-content: space-between;
+                       padding: 16px 0;
+                       border-bottom: 1px solid var(--global-text-color-light, rgba(0,0,0,0.15));
+                       font-size: 16px;
+                       line-height: 1.5;
+                       color: var(--global-text-color, currentColor);">
+<div style="display: flex;
+                           flex-direction: column;
+                           gap: 8px;">
+<div>
+<span style="font-weight: 600; color: var(--global-text-color, currentColor);">🔗 英文原文：</span>
+<a href="https://jax-ml.github.io/scaling-book/roofline/" onmouseout="this.style.textDecoration='none'" onmouseover="this.style.textDecoration='underline'" rel="noopener noreferrer" style="color: var(--global-theme-color, #004276);
+                                  text-decoration: none;
+                                  margin-left: 4px;" target="_blank">
+                           https://jax-ml.github.io/scaling-book/roofline/
+                        </a>
+</div>
+<div>
+<span style="font-weight: 600; color: var(--global-text-color, currentColor);">✍️ 翻译：</span>
+<span style="margin-left: 4px; color: var(--global-text-color, currentColor);">北极的树</span>
+</div>
+</div>
+<div style="flex-shrink: 0;
+                           display: flex;
+                           flex-direction: column;
+                           align-items: center;
+                           gap: 6px;
+                           margin-left: 20px;">
+<img alt="微信二维码" loading="lazy" src="https://wechat-account-1251781786.cos.ap-guangzhou.myqcloud.com/wechat_account.jpeg" style="width: 80px;
+                                height: 80px;
+                                border-radius: 6px;
+                                opacity: 0.9;"/>
+<span style="font-size: 12px;
+                                 color: var(--global-text-color-light, currentColor);
+                                 opacity: 0.8;
+                                 text-align: center;">
+                        微信公众号
+                    </span>
+</div>
+</div>
+</div> <d-title> <h1>关于屋顶线模型的一切</h1> <p>第 1 部分，来自 <a href="scaling-book.html">如何扩展你的模型</a> (<a href="scaling-book.html">第 0 部分：引言</a> | <a href="tpus.html">第 2 部分：TPU</a>)</p> <p>当我们在硬件上运行算法时，会受到三件事的限制：计算机的数学运算速度（OPs/秒）、移动数据的可用带宽（字节/秒），以及存储数据的总可用内存（字节）。这些“屋顶线”约束使我们能够为一个给定的计算设定时间的上限和下限。</p> </d-title> <d-byline>
+<div class="byline grid">
+<div class="authors-affiliations grid">
+<h3 style="grid-column: 1; grid-row: 1;">作者</h3>
+<h3></h3>
+<h3>单位</h3>
+<p class="author" style="grid-column: 1; grid-row: 2;">
+<a class="name" href="https://www.jacobaustin.org/">Jacob Austin</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 2;">
+<span class="affiliation">Google DeepMind</span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 3;">
+<a class="name" href="https://x.com/_sholtodouglas">Sholto Douglas</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 3;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 4;">
+<a class="name" href="https://cs.stanford.edu/~rfrostig/">Roy Frostig</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 4;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 5;">
+<a class="name" href="https://anselmlevskaya.com/">Anselm Levskaya</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 5;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 6;">
+<a class="name" href="https://x.com/charliexychen">Charlie Chen</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 6;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 7;">
+<a class="name" href="https://sharadvikram.com/">Sharad Vikram</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 7;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 2;">
+<a class="name" href="https://fedelebron.com/">Federico Lebron</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 2;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 3;">
+<a class="name" href="https://x.com/pchoy95">Peter Choy</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 3;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 4;">
+<a class="name" href="https://x.com/vinayramasesh">Vinay Ramasesh</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 4;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 5;">
+<a class="name" href="https://representation.ai/">Albert Webson</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 5;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 6;">
+<a class="name" href="https://x.com/reinerpope">Reiner Pope<sup>*</sup></a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 6;">
+<span class="affiliation"></span>
+</p>
+</div>
+<div>
+<h3>发布日期</h3>
+<p>2025年2月4日</p>
+</div>
+</div>
+</d-byline> <d-article> <d-contents> <nav class="l-text figcaption"> <h3>目录</h3> <div> <a href="#where-does-the-time-go">时间都去哪儿了？</a> </div> <div> <a href="#"></a> </div> <ul> <li> <a href="#visualizing-rooflines">可视化屋顶线模型</a> </li> <li> <a href="#matrix-multiplication">矩阵乘法</a> </li> <li> <a href="#network-communication-rooflines">网络通信屋顶线模型</a> </li> </ul> <div> <a href="#a-few-problems-to-work">几个练习题</a> </div> </nav> </d-contents> <h2 id="where-does-the-time-go">时间都去哪儿了？</h2> <p>让我们从一个极其简单的问题开始：<em>为什么一个算法需要 50 毫秒，而不是 50 秒或 5 毫秒</em>？模型内部究竟发生了什么耗费了大量时间，我们又该预期它需要多长时间？</p> <p><strong>计算：</strong> 深度学习模型实际上是一系列矩阵乘法，每个矩阵乘法由浮点乘法和加法“运算”（FLOPs）组成。我们的加速器速度决定了计算这些运算所需的时间：</p><span> <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="0" display="true" jax="CHTML" style="font-size: 116.9%; min-width: 17.459em; position: relative;" tabindex="0" width="full"><mjx-math aria-hidden="true" class="MJX-TEX" display="true" width="full"><mjx-mtable side="right" style="min-width: 17.459em;" width="full"><mjx-table style="width: auto; min-width: 13.303em; margin: 0px 2.078em;"><mjx-itable width="full"><mjx-mlabeledtr><mjx-mtd><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">计算</mjx-mtext></mjx-script></mjx-msub><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mtext class="mjx-n">计算 FLOPs</mjx-mtext></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mtext class="mjx-n">加速器 FLOPs/秒</mjx-mtext></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-tstrut></mjx-tstrut></mjx-mtd></mjx-mlabeledtr></mjx-itable></mjx-table><mjx-labels style="width: 17.459em;"><mjx-itable align="right" style="right: 0px;"><mjx-mtr style="height: 2.341em;"><mjx-mtd id="mjx-eqn:1"><mjx-mtext class="mjx-n"><mjx-c class="mjx-c28"></mjx-c><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c29"></mjx-c></mjx-mtext><mjx-tstrut style="height: 2.341em; vertical-align: -0.96em;"></mjx-tstrut></mjx-mtd></mjx-mtr></mjx-itable></mjx-labels></mjx-mtable></mjx-math><mjx-assistive-mml display="block" unselectable="on"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mtable displaystyle="true"><mlabeledtr><mtd><mtext>(1)</mtext></mtd><mtd><msub><mi>T</mi><mtext>math</mtext></msub><mo>=</mo><mfrac><mtext>Computation FLOPs</mtext><mtext>Accelerator FLOPs/s</mtext></mfrac></mtd></mlabeledtr></mtable></math></mjx-assistive-mml></mjx-container> </span><p>例如，一台 NVIDIA H100 每秒可执行约 9.89e14 次 bfloat16<d-footnote id="d-footnote-1">bf16 是 <a href="https://en.wikipedia.org/wiki/Bfloat16_floating-point_format" rel="external nofollow noopener" target="_blank">bfloat16</a> 的缩写，一种常用于机器学习的 16 位浮点格式。</d-footnote> FLOPs，而一台 TPU v6e 每秒可执行 9.1e14 次 FLOPs。<d-footnote id="d-footnote-2">H100 和 B200 通常只能达到声称的峰值 FLOPs 的 80-85% 左右，而 TPU 在正常使用中可以接近 95%。</d-footnote> 这意味着在 H100 上执行 1e12 FLOPs 大约需要 <code class="language-plaintext highlighter-rouge">1e12 / 9.89e14 = 1.01ms</code>，而在 TPU v6e 上需要 <code class="language-plaintext highlighter-rouge">1e12 / 9.1e14 = 1.1ms</code>。<d-footnote id="d-footnote-3">请注意，这些芯片的定价不同，此比较未按成本进行归一化。</d-footnote></p> <p><strong>芯片内通信：</strong> <em>在加速器内部</em>，张量需要在片上内存（HBM）和计算核心之间传输。你会看到这个链接的带宽被称为“HBM 带宽”<d-footnote id="d-footnote-4">NVIDIA 也称之为“内存带宽”。</d-footnote> 在 H100 上，<a href="https://www.nvidia.com/en-us/data-center/h100/" rel="external nofollow noopener" target="_blank">这个值大约是 3.35TB/s</a>，在 TPU v6e 上<a href="https://cloud.google.com/tpu/docs/v6e" rel="external nofollow noopener" target="_blank">这个值大约是 1.6TB/s</a>。</p> <p><strong>芯片间通信：</strong> 当我们将模型分布在<em>多个加速器</em>上时，张量需要频繁地在它们之间传输。我们的硬件通常为此提供几种选择（ICI、DCN 和 PCIe），每种选择都有不同的带宽。</p> <p>无论是芯片内还是芯片间的通信，我们都以字节/秒为单位来衡量，并用以下公式估算总通信时间：</p><span> <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="1" display="true" jax="CHTML" style="font-size: 116.9%; min-width: 25.238em; position: relative;" tabindex="0" width="full"><mjx-math aria-hidden="true" class="MJX-TEX" display="true" width="full"><mjx-mtable side="right" style="min-width: 25.238em;" width="full"><mjx-table style="width: auto; min-width: 21.082em; margin: 0px 2.078em;"><mjx-itable width="full"><mjx-mlabeledtr><mjx-mtd><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">通信</mjx-mtext></mjx-script></mjx-msub><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mtext class="mjx-n">通信字节数</mjx-mtext></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mtext class="mjx-n">网络/内存带宽 字节/秒</mjx-mtext></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-tstrut></mjx-tstrut></mjx-mtd></mjx-mlabeledtr></mjx-itable></mjx-table><mjx-labels style="width: 25.238em;"><mjx-itable align="right" style="right: 0px;"><mjx-mtr style="height: 2.341em;"><mjx-mtd id="mjx-eqn:2"><mjx-mtext class="mjx-n"><mjx-c class="mjx-c28"></mjx-c><mjx-c class="mjx-c32"></mjx-c><mjx-c class="mjx-c29"></mjx-c></mjx-mtext><mjx-tstrut style="height: 2.341em; vertical-align: -0.96em;"></mjx-tstrut></mjx-mtd></mjx-mtr></mjx-itable></mjx-labels></mjx-mtable></mjx-math><mjx-assistive-mml display="block" unselectable="on"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mtable displaystyle="true"><mlabeledtr><mtd><mtext>(2)</mtext></mtd><mtd><msub><mi>T</mi><mtext>comms</mtext></msub><mo>=</mo><mfrac><mtext>Communication Bytes</mtext><mtext>Network/Memory Bandwidth Bytes/s</mtext></mfrac></mtd></mlabeledtr></mtable></math></mjx-assistive-mml></mjx-container> </span><p>通常情况下（但并非总是如此），单个芯片内的计算可以与芯片内和芯片间的通信重叠。这意味着<strong>我们可以通过计算时间和通信时间的最大值来确定训练和推理时间的下限</strong>。我们也可以<strong>用它们的和来确定上限</strong>。在实践中，我们针对最大值进行优化，因为代数上更简单，而且通过重叠通信和计算，我们通常可以接近这个下限。如果我们以最大值为目标进行优化，那么下限和上限最多相差 2 倍，因为 <d-math>T_\text{math} + T_\text{comms} \leq 2 * \max(T_\text{math}, T_\text{comms})</d-math>。然后，我们可以通过对“重叠区域”和开销进行建模来进一步提高准确性，这可以通过分析特定模型和目标系统来获得信息。</p><span> <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="2" display="true" jax="CHTML" style="font-size: 116.9%; min-width: 15.961em; position: relative;" tabindex="0" width="full"><mjx-math aria-hidden="true" class="MJX-TEX" display="true" width="full"><mjx-mtable side="right" style="min-width: 15.961em;" width="full"><mjx-table style="width: auto; min-width: 11.805em; margin: 0px 2.078em;"><mjx-itable width="full"><mjx-mlabeledtr><mjx-mtd><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">下限</mjx-mtext></mjx-script></mjx-msub><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c6D"></mjx-c><mjx-c class="mjx-c61"></mjx-c><mjx-c class="mjx-c78"></mjx-c></mjx-mo><mjx-mo class="mjx-n"><mjx-c class="mjx-c28"></mjx-c></mjx-mo><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">计算</mjx-mtext></mjx-script></mjx-msub><mjx-mo class="mjx-n"><mjx-c class="mjx-c2C"></mjx-c></mjx-mo><mjx-msub space="2"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">通信</mjx-mtext></mjx-script></mjx-msub><mjx-mo class="mjx-n"><mjx-c class="mjx-c29"></mjx-c></mjx-mo><mjx-tstrut></mjx-tstrut></mjx-mtd></mjx-mlabeledtr></mjx-itable></mjx-table><mjx-labels style="width: 15.961em;"><mjx-itable align="right" style="right: 0px;"><mjx-mtr style="height: 1em;"><mjx-mtd id="mjx-eqn:3"><mjx-mtext class="mjx-n"><mjx-c class="mjx-c28"></mjx-c><mjx-c class="mjx-c33"></mjx-c><mjx-c class="mjx-c29"></mjx-c></mjx-mtext><mjx-tstrut style="height: 1em; vertical-align: -0.25em;"></mjx-tstrut></mjx-mtd></mjx-mtr></mjx-itable></mjx-labels></mjx-mtable></mjx-math><mjx-assistive-mml display="block" unselectable="on"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mtable displaystyle="true"><mlabeledtr><mtd><mtext>(3)</mtext></mtd><mtd><msub><mi>T</mi><mtext>lower</mtext></msub><mo>=</mo><mo data-mjx-texclass="OP" movablelimits="true">max</mo><mo stretchy="false">(</mo><msub><mi>T</mi><mtext>math</mtext></msub><mo>,</mo><msub><mi>T</mi><mtext>comms</mtext></msub><mo stretchy="false">)</mo></mtd></mlabeledtr></mtable></math></mjx-assistive-mml></mjx-container> <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="3" display="true" jax="CHTML" style="font-size: 116.9%; min-width: 14.219em; position: relative;" tabindex="0" width="full"><mjx-math aria-hidden="true" class="MJX-TEX" display="true" width="full"><mjx-mtable side="right" style="min-width: 14.219em;" width="full"><mjx-table style="width: auto; min-width: 10.063em; margin: 0px 2.078em;"><mjx-itable width="full"><mjx-mlabeledtr><mjx-mtd><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">上限</mjx-mtext></mjx-script></mjx-msub><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-msub space="4"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">计算</mjx-mtext></mjx-script></mjx-msub><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-msub space="3"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">通信</mjx-mtext></mjx-script></mjx-msub><mjx-tstrut></mjx-tstrut></mjx-mtd></mjx-mlabeledtr></mjx-itable></mjx-table><mjx-labels style="width: 14.219em;"><mjx-itable align="right" style="right: 0px;"><mjx-mtr style="height: 1.037em;"><mjx-mtd id="mjx-eqn:4"><mjx-mtext class="mjx-n"><mjx-c class="mjx-c28"></mjx-c><mjx-c class="mjx-c34"></mjx-c><mjx-c class="mjx-c29"></mjx-c></mjx-mtext><mjx-tstrut style="height: 1.037em; vertical-align: -0.287em;"></mjx-tstrut></mjx-mtd></mjx-mtr></mjx-itable></mjx-labels></mjx-mtable></mjx-math><mjx-assistive-mml display="block" unselectable="on"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mtable displaystyle="true"><mlabeledtr><mtd><mtext>(4)</mtext></mtd><mtd><msub><mi>T</mi><mtext>upper</mtext></msub><mo>=</mo><msub><mi>T</mi><mtext>math</mtext></msub><mo>+</mo><msub><mi>T</mi><mtext>comms</mtext></msub></mtd></mlabeledtr></mtable></math></mjx-assistive-mml></mjx-container> </span><p>如果我们假设可以完美地重叠通信和计算，当 <d-math>T_\text{math} &gt; T_\text{comms}</d-math> 时，我们可以看到硬件得到了充分利用。我们称之为“计算受限”（compute-bound）。当 <d-math>T_\text{comms} &gt; T_\text{math}</d-math> 时，我们倾向于“通信受限”（communication-bound），并且至少有一部分加速器 FLOPs/秒因等待数据传输而被浪费。判断一个操作是计算受限还是通信受限的一种方法是看它的“<em>算术强度</em>”（arithmetic intensity）或“<em>操作强度</em>”（operational intensity）。</p> <p><strong>定义：</strong> 算法的算术强度是指其执行的总 FLOPs 与其需要通信的字节数（无论是芯片内还是芯片间）之比。</p><span> <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="4" display="true" jax="CHTML" style="font-size: 116.9%; min-width: 24.486em; position: relative;" tabindex="0" width="full"><mjx-math aria-hidden="true" class="MJX-TEX" display="true" width="full"><mjx-mtable side="right" style="min-width: 24.486em;" width="full"><mjx-table style="width: auto; min-width: 20.33em; margin: 0px 2.078em;"><mjx-itable width="full"><mjx-mlabeledtr><mjx-mtd><mjx-mtext class="mjx-n">算术强度</mjx-mtext><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mtext class="mjx-n">计算 FLOPs</mjx-mtext></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mtext class="mjx-n">通信字节数</mjx-mtext></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-tstrut></mjx-tstrut></mjx-mtd></mjx-mlabeledtr></mjx-itable></mjx-table><mjx-labels style="width: 24.486em;"><mjx-itable align="right" style="right: 0px;"><mjx-mtr style="height: 2.271em;"><mjx-mtd id="mjx-eqn:5"><mjx-mtext class="mjx-n"><mjx-c class="mjx-c28"></mjx-c><mjx-c class="mjx-c35"></mjx-c><mjx-c class="mjx-c29"></mjx-c></mjx-mtext><mjx-tstrut style="height: 2.271em; vertical-align: -0.89em;"></mjx-tstrut></mjx-mtd></mjx-mtr></mjx-itable></mjx-labels></mjx-mtable></mjx-math><mjx-assistive-mml display="block" unselectable="on"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mtable displaystyle="true"><mlabeledtr><mtd><mtext>(5)</mtext></mtd><mtd><mtext>Arithmetic Intensity</mtext><mo>=</mo><mfrac><mtext>Computation FLOPs</mtext><mtext>Communication Bytes</mtext></mfrac></mtd></mlabeledtr></mtable></math></mjx-assistive-mml></mjx-container> </span><p>算术强度衡量的是给定操作的“每字节 FLOPs”。作为一阶近似，当我们的算术强度高时，<d-math>T_\text{math}</d-math> 相对于 <d-math>T_\text{comms}</d-math> 较大，我们通常会使用大部分可用的 FLOPs。当情况相反时，我们花费更多时间在通信上，并浪费了 FLOPs。发生这种交叉的点是我们硬件的“峰值算术强度”，即峰值加速器 FLOPs/秒与加速器带宽之比。</p><span> <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="5" display="true" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX" display="true" style="margin-left: 0px; margin-right: 0px;"><mjx-mtable style="min-width: 29.082em;"><mjx-table><mjx-itable><mjx-mtr><mjx-mtd style="text-align: right; padding-right: 0px; padding-bottom: 0.4em;"><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">计算</mjx-mtext></mjx-script></mjx-msub><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3E"></mjx-c></mjx-mo><mjx-msub space="4"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">通信</mjx-mtext></mjx-script></mjx-msub><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c21D4"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mtext class="mjx-n">计算 FLOPs</mjx-mtext></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mtext class="mjx-n">加速器 FLOPs/秒</mjx-mtext></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3E"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mtext class="mjx-n">通信字节数</mjx-mtext></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mtext class="mjx-n">带宽 字节/秒</mjx-mtext></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-tstrut></mjx-tstrut></mjx-mtd><mjx-mtd style="text-align: left; padding-left: 0px; padding-bottom: 0.4em;"><mjx-tstrut></mjx-tstrut></mjx-mtd></mjx-mtr><mjx-mtr><mjx-mtd style="text-align: right; padding-right: 0px; padding-top: 0.4em; padding-bottom: 0.4em;"><mjx-mo class="mjx-n"><mjx-c class="mjx-c21D4"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mtext class="mjx-n">计算 FLOPs</mjx-mtext></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mtext class="mjx-n">通信字节数</mjx-mtext></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3E"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mtext class="mjx-n">加速器 FLOPs/秒</mjx-mtext></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mtext class="mjx-n">带宽 字节/秒</mjx-mtext></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-tstrut></mjx-tstrut></mjx-mtd><mjx-mtd style="text-align: left; padding-left: 0px; padding-top: 0.4em; padding-bottom: 0.4em;"><mjx-tstrut></mjx-tstrut></mjx-mtd></mjx-mtr><mjx-mtr><mjx-mtd style="text-align: right; padding-right: 0px; padding-top: 0.4em;"><mjx-mo class="mjx-n"><mjx-c class="mjx-c21D4"></mjx-c></mjx-mo><mjx-mtext class="mjx-n" space="4">强度</mjx-mtext><mjx-mo class="mjx-n"><mjx-c class="mjx-c28"></mjx-c></mjx-mo><mjx-mtext class="mjx-n">计算</mjx-mtext><mjx-mo class="mjx-n"><mjx-c class="mjx-c29"></mjx-c></mjx-mo><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3E"></mjx-c></mjx-mo><mjx-mtext class="mjx-n" space="4">强度</mjx-mtext><mjx-mo class="mjx-n"><mjx-c class="mjx-c28"></mjx-c></mjx-mo><mjx-mtext class="mjx-n">加速器</mjx-mtext><mjx-mo class="mjx-n"><mjx-c class="mjx-c29"></mjx-c></mjx-mo><mjx-tstrut></mjx-tstrut></mjx-mtd><mjx-mtd style="text-align: left; padding-left: 0px; padding-top: 0.4em;"><mjx-tstrut></mjx-tstrut></mjx-mtd></mjx-mtr></mjx-itable></mjx-table></mjx-mtable></mjx-math><mjx-assistive-mml display="block" unselectable="on"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mtable columnalign="right left" columnspacing="0em" displaystyle="true" rowspacing="0.8em 0.8em 0.3em"><mtr><mtd><msub><mi>T</mi><mtext>math</mtext></msub><mo>&gt;</mo><msub><mi>T</mi><mtext>comms</mtext></msub><mo stretchy="false">&amp;⇔</mo><mfrac><mtext>Computation FLOPs</mtext><mtext>Accelerator FLOPs/s</mtext></mfrac><mo>&gt;</mo><mfrac><mtext>Communication Bytes</mtext><mtext>Bandwidth Bytes/s</mtext></mfrac></mtd><mtd></mtd></mtr><mtr><mtd><mo stretchy="false">&amp;⇔</mo><mfrac><mtext>Computation FLOPs</mtext><mtext>Communication Bytes</mtext></mfrac><mo>&gt;</mo><mfrac><mtext>Accelerator FLOPs/s</mtext><mtext>Bandwidth Bytes/s</mtext></mfrac></mtd><mtd></mtd></mtr><mtr><mtd><mo stretchy="false">&amp;⇔</mo><mtext>Intensity</mtext><mo stretchy="false">(</mo><mtext>Computation</mtext><mo stretchy="false">)</mo><mo>&gt;</mo><mtext>Intensity</mtext><mo stretchy="false">(</mo><mtext>Accelerator</mtext><mo stretchy="false">)</mo></mtd><mtd></mtd></mtr></mtable></math></mjx-assistive-mml></mjx-container> </span><p><d-math>\text{Intensity}(\text{Accelerator})</d-math> 这个量是我们的加速器达到其峰值 FLOPs/秒时的算术强度。<strong>对于 TPU v5e MXU，这个值大约是 240 FLOPs/字节</strong><d-footnote id="d-footnote-5">MXU 是 TPU 上的矩阵乘法单元。我们在这里特别指出，是因为 TPU 还有其他加速器，如 VPU，它负责元素级操作，具有不同的峰值 FLOPs/秒。</d-footnote>，因为 TPU 每秒可以执行 <code class="language-plaintext highlighter-rouge">1.97e14</code> FLOPs 并从 HBM 加载 <code class="language-plaintext highlighter-rouge">8.2e11</code> 字节/秒。这意味着如果一个算法的算术强度低于 240<d-footnote id="d-footnote-6">这仅在算法从 HBM 加载权重并在 MXU 中运行时才成立。正如我们将在下一节讨论的，我们有时可以将参数存储在具有更高带宽的 VMEM 中。许多算法也在 VPU 中运行，它具有不同的性能特征。</d-footnote> FLOPs/字节，它将受到字节加载的限制，因此我们无法充分利用硬件。让我们看一个这样的例子：</p> <p><strong><span style="color:#7ab5ff">示例（点积）</span>:</strong> 为了以 bfloat16 精度计算两个向量的点积，<code class="language-plaintext highlighter-rouge">x • y: bf16[N], bf16[N] → bf16[1]</code>，我们需要从内存中加载 <d-math>x</d-math> 和 <d-math>y</d-math>，每个向量有 <d-math>2 * N = 2N</d-math> 字节，执行 <d-math>N</d-math> 次乘法和 <d-math>N-1</d-math> 次加法，并将 <d-math>2</d-math> 字节写回 HBM <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="6" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX" width="full"><mjx-mtable side="right" style="min-width: 36.335em;" width="full"><mjx-table style="width: auto; min-width: 32.179em; margin: 0px 2.078em;"><mjx-itable width="full"><mjx-mlabeledtr><mjx-mtd><mjx-mtext class="mjx-n">强度</mjx-mtext><mjx-mo class="mjx-n"><mjx-c class="mjx-c28"></mjx-c></mjx-mo><mjx-mtext class="mjx-n">点积</mjx-mtext><mjx-mo class="mjx-n"><mjx-c class="mjx-c29"></mjx-c></mjx-mo><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mtext class="mjx-n">总 FLOPs</mjx-mtext></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mtext class="mjx-n">总字节数</mjx-mtext></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D441 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="3"><mjx-c class="mjx-c1D441 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2212"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="3"><mjx-c class="mjx-c31"></mjx-c></mjx-mn></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D441 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="3"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D441 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="3"><mjx-c class="mjx-c32"></mjx-c></mjx-mn></mjx-mrow></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D441 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2212"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="3"><mjx-c class="mjx-c31"></mjx-c></mjx-mn></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c34"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D441 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="3"><mjx-c class="mjx-c32"></mjx-c></mjx-mn></mjx-mrow></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c2192"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c></mjx-mn></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-tstrut></mjx-tstrut></mjx-mtd></mjx-mlabeledtr></mjx-itable></mjx-table><mjx-labels style="width: 36.335em;"><mjx-itable align="right" style="right: 0px;"><mjx-mtr style="height: 2.271em;"><mjx-mtd id="mjx-eqn:6"><mjx-mtext class="mjx-n"><mjx-c class="mjx-c28"></mjx-c><mjx-c class="mjx-c36"></mjx-c><mjx-c class="mjx-c29"></mjx-c></mjx-mtext><mjx-tstrut style="height: 2.271em; vertical-align: -0.89em;"></mjx-tstrut></mjx-mtd></mjx-mtr></mjx-itable></mjx-labels></mjx-mtable></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mtable displaystyle="true"><mlabeledtr><mtd><mtext>(6)</mtext></mtd><mtd><mtext>Intensity</mtext><mo stretchy="false">(</mo><mtext>dot product</mtext><mo stretchy="false">)</mo><mo>=</mo><mfrac><mtext>Total FLOPs</mtext><mtext>Total Bytes</mtext></mfrac><mo>=</mo><mfrac><mrow><mi>N</mi><mo>+</mo><mi>N</mi><mo>−</mo><mn>1</mn></mrow><mrow><mn>2</mn><mi>N</mi><mo>+</mo><mn>2</mn><mi>N</mi><mo>+</mo><mn>2</mn></mrow></mfrac><mo>=</mo><mfrac><mrow><mn>2</mn><mi>N</mi><mo>−</mo><mn>1</mn></mrow><mrow><mn>4</mn><mi>N</mi><mo>+</mo><mn>2</mn></mrow></mfrac><mo stretchy="false">→</mo><mfrac><mn>1</mn><mn>2</mn></mfrac></mtd></mlabeledtr></mtable></math></mjx-assistive-mml></mjx-container></p> <p>当 <d-math>N\rightarrow\infty</d-math>。所以点积的算术强度为 <d-math>\frac{1}{2}</d-math>，换句话说，点积每加载一个字节执行 0.5 次浮点运算。这意味着我们的算术强度低于硬件的算术强度，我们将受到通信的限制。<d-footnote id="d-footnote-7">上面 240 这个数字在这里不是一个正确的比较，因为正如你将在下一节看到的，点积是在 VPU 而非 MXU 上执行的。TPU v5p VPU 每秒大约可以执行 7e12 FLOPs，所以它的临界强度大约是 3，这意味着在这里我们仍然有些受通信限制。无论如何，我们的强度低且恒定这一事实意味着在大多数硬件上都很难达到计算受限。</d-footnote></p> <h3 id="visualizing-rooflines">可视化屋顶线模型</h3> <p>我们可以使用<strong>屋顶线图</strong>（roofline plot）来可视化内存和计算之间的权衡。该图将算法在我们的硬件上可实现的峰值 FLOPs/秒（吞吐量）（y 轴）与该算法的算术强度（x 轴）进行对比。这是一个对数-对数图的例子：</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/roofline-improved-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/roofline-improved-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/roofline-improved-1400.webp 1400w" type="image/webp"/> <img class="img-fluid" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/roofline-improved.png" width="100%"/> </picture> <figcaption class="caption"><b>图：</b>一个屋顶线图示例，展示了两个具有不同算术强度的算法（算法1和算法2）以及它们在不同带宽（BW1和BW2）下对应的理论峰值吞吐量。在红色区域，算法在两种带宽下都受带宽限制，并浪费了硬件峰值 FLOPs/s 的一部分。黄色区域仅在较低带宽（BW1）下受带宽限制。绿色区域在所有带宽下都受计算限制。在这里，我们正在使用加速器的峰值 FLOPs/s，增加带宽或提高强度不会带来任何好处。</figcaption> </figure> <p>上图中，随着强度的增加（从左到右），我们最初看到算法性能（以 FLOPs/秒为单位）呈线性增长，直到达到硬件的临界算术强度，在 TPU v5e 的情况下为 240。任何强度较低的算法都将受到带宽（BW）的限制，并受限于峰值内存带宽（红色区域所示）。任何在右侧的算法都将充分利用我们的 FLOPs（绿色区域所示）。在这里，算法1受通信限制，只使用了总硬件 FLOPs/s 的一小部分。算法2受计算限制。我们通常可以通过增加算法的算术强度或增加可用内存带宽（从 BW1 移动到 BW2）来提高算法的性能。</p> <h3 id="matrix-multiplication">矩阵乘法</h3> <p>让我们来看看我们即将最喜欢的算法：矩阵乘法（也称为 matmul）。我们写作 <d-math>X * Y \rightarrow Z</d-math>，其中 <d-math>X</d-math> 的形状为 <d-math>\text{bf16}[B, D]</d-math>，<d-math>Y</d-math> 的形状为 <d-math>\text{bf16}[D, F]</d-math>，<d-math>Z</d-math> 的形状为 <d-math>\text{bf16}[B, F]</d-math>。为了进行矩阵乘法，我们需要加载 <d-math>2DF + 2BD</d-math> 字节，执行 <d-math>2BDF</d-math> FLOPs，并写回 <d-math>2BF</d-math> 字节。<d-footnote id="d-footnote-8">技术上讲，我们执行 <d-math>BF \times (2D - 1)</d-math> FLOPs，但这已经足够接近了。这来自于 <d-math>BDF</d-math> 次乘法和 <d-math>BF * (D-1)</d-math> 次加法。第 4 节有更多细节。</d-footnote> <d-footnote id="d-footnote-9">虽然矩阵乘法的输出技术上是 float32，但我们通常在复制回 HBM 之前将其转换为 bfloat16。</d-footnote> 因此：</p><span> <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="7" display="true" jax="CHTML" style="font-size: 116.9%; min-width: 31.499em; position: relative;" tabindex="0" width="full"><mjx-math aria-hidden="true" class="MJX-TEX" display="true" width="full"><mjx-mtable side="right" style="min-width: 31.499em;" width="full"><mjx-table style="width: auto; min-width: 27.343em; margin: 0px 2.078em;"><mjx-itable width="full"><mjx-mlabeledtr><mjx-mtd><mjx-mtext class="mjx-n">强度</mjx-mtext><mjx-mo class="mjx-n"><mjx-c class="mjx-c28"></mjx-c></mjx-mo><mjx-mtext class="mjx-n">matmul</mjx-mtext><mjx-mo class="mjx-n"><mjx-c class="mjx-c29"></mjx-c></mjx-mo><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="3"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="3"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-mrow></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mrow><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="3"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="3"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-mrow></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-tstrut></mjx-tstrut></mjx-mtd></mjx-mlabeledtr></mjx-itable></mjx-table><mjx-labels style="width: 31.499em;"><mjx-itable align="right" style="right: 0px;"><mjx-mtr style="height: 2.127em;"><mjx-mtd id="mjx-eqn:7"><mjx-mtext class="mjx-n"><mjx-c class="mjx-c28"></mjx-c><mjx-c class="mjx-c37"></mjx-c><mjx-c class="mjx-c29"></mjx-c></mjx-mtext><mjx-tstrut style="height: 2.127em; vertical-align: -0.768em;"></mjx-tstrut></mjx-mtd></mjx-mtr></mjx-itable></mjx-labels></mjx-mtable></mjx-math><mjx-assistive-mml display="block" unselectable="on"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mtable displaystyle="true"><mlabeledtr><mtd><mtext>(7)</mtext></mtd><mtd><mtext>Intensity</mtext><mo stretchy="false">(</mo><mtext>matmul</mtext><mo stretchy="false">)</mo><mo>=</mo><mfrac><mrow><mn>2</mn><mi>B</mi><mi>D</mi><mi>F</mi></mrow><mrow><mn>2</mn><mi>B</mi><mi>D</mi><mo>+</mo><mn>2</mn><mi>D</mi><mi>F</mi><mo>+</mo><mn>2</mn><mi>B</mi><mi>F</mi></mrow></mfrac><mo>=</mo><mfrac><mrow><mi>B</mi><mi>D</mi><mi>F</mi></mrow><mrow><mi>B</mi><mi>D</mi><mo>+</mo><mi>D</mi><mi>F</mi><mo>+</mo><mi>B</mi><mi>F</mi></mrow></mfrac></mtd></mlabeledtr></mtable></math></mjx-assistive-mml></mjx-container> </span><p>如果我们假设我们的“批次大小” <d-math>B</d-math> 相对于 <d-math>D</d-math> 和 <d-math>F</d-math> 较小，我们可以得到一个很好的简化。然后我们得到</p><span> <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="8" display="true" jax="CHTML" style="font-size: 116.9%; min-width: 17.915em; position: relative;" tabindex="0" width="full"><mjx-math aria-hidden="true" class="MJX-TEX" display="true" width="full"><mjx-mtable side="right" style="min-width: 17.915em;" width="full"><mjx-table style="width: auto; min-width: 13.759em; margin: 0px 2.078em;"><mjx-itable width="full"><mjx-mlabeledtr><mjx-mtd><mjx-mfrac><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mrow><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="3"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="3"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-mrow></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c224A TEX-A"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mrow><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-mrow></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="4"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-tstrut></mjx-tstrut></mjx-mtd></mjx-mlabeledtr></mjx-itable></mjx-table><mjx-labels style="width: 17.915em;"><mjx-itable align="right" style="right: 0px;"><mjx-mtr style="height: 2.127em;"><mjx-mtd id="mjx-eqn:8"><mjx-mtext class="mjx-n"><mjx-c class="mjx-c28"></mjx-c><mjx-c class="mjx-c38"></mjx-c><mjx-c class="mjx-c29"></mjx-c></mjx-mtext><mjx-tstrut style="height: 2.127em; vertical-align: -0.768em;"></mjx-tstrut></mjx-mtd></mjx-mtr></mjx-itable></mjx-labels></mjx-mtable></mjx-math><mjx-assistive-mml display="block" unselectable="on"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mtable displaystyle="true"><mlabeledtr><mtd><mtext>(8)</mtext></mtd><mtd><mfrac><mrow><mi>B</mi><mi>D</mi><mi>F</mi></mrow><mrow><mi>B</mi><mi>D</mi><mo>+</mo><mi>D</mi><mi>F</mi><mo>+</mo><mi>B</mi><mi>F</mi></mrow></mfrac><mo>≊</mo><mfrac><mrow><mi>B</mi><mi>D</mi><mi>F</mi></mrow><mrow><mi>D</mi><mi>F</mi></mrow></mfrac><mo>=</mo><mi>B</mi></mtd></mlabeledtr></mtable></math></mjx-assistive-mml></mjx-container> <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="9" display="true" jax="CHTML" style="font-size: 116.9%; min-width: 31.737em; position: relative;" tabindex="0" width="full"><mjx-math aria-hidden="true" class="MJX-TEX" display="true" width="full"><mjx-mtable side="right" style="min-width: 31.737em;" width="full"><mjx-table style="width: auto; min-width: 27.581em; margin: 0px 2.078em;"><mjx-itable width="full"><mjx-mlabeledtr><mjx-mtd><mjx-mtext class="mjx-n">强度</mjx-mtext><mjx-mo class="mjx-n"><mjx-c class="mjx-c28"></mjx-c></mjx-mo><mjx-mtext class="mjx-n">matmul</mjx-mtext><mjx-mo class="mjx-n"><mjx-c class="mjx-c29"></mjx-c></mjx-mo><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3E"></mjx-c></mjx-mo><mjx-mtext class="mjx-n" space="4">强度</mjx-mtext><mjx-mo class="mjx-n"><mjx-c class="mjx-c28"></mjx-c></mjx-mo><mjx-mtext class="mjx-n">TPU</mjx-mtext><mjx-mo class="mjx-n"><mjx-c class="mjx-c29"></mjx-c></mjx-mo><mjx-mstyle><mjx-mspace style="width: 0.278em;"></mjx-mspace></mjx-mstyle><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c27F9"></mjx-c></mjx-mo><mjx-mstyle><mjx-mspace style="width: 0.278em;"></mjx-mspace></mjx-mstyle><mjx-mi class="mjx-i" space="4"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3E"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c2E"></mjx-c><mjx-c class="mjx-c39"></mjx-c><mjx-c class="mjx-c37"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D452 TEX-I"></mjx-c></mjx-mi><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c34"></mjx-c></mjx-mn></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c38"></mjx-c><mjx-c class="mjx-c2E"></mjx-c><mjx-c class="mjx-c32"></mjx-c><mjx-c class="mjx-c30"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D452 TEX-I"></mjx-c></mjx-mi><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c31"></mjx-c></mjx-mn></mjx-mrow></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="4"><mjx-c class="mjx-c32"></mjx-c><mjx-c class="mjx-c34"></mjx-c><mjx-c class="mjx-c30"></mjx-c></mjx-mn><mjx-tstrut></mjx-tstrut></mjx-mtd></mjx-mlabeledtr></mjx-itable></mjx-table><mjx-labels style="width: 31.737em;"><mjx-itable align="right" style="right: 0px;"><mjx-mtr style="height: 2.061em;"><mjx-mtd id="mjx-eqn:9"><mjx-mtext class="mjx-n"><mjx-c class="mjx-c28"></mjx-c><mjx-c class="mjx-c39"></mjx-c><mjx-c class="mjx-c29"></mjx-c></mjx-mtext><mjx-tstrut style="height: 2.061em; vertical-align: -0.708em;"></mjx-tstrut></mjx-mtd></mjx-mtr></mjx-itable></mjx-labels></mjx-mtable></mjx-math><mjx-assistive-mml display="block" unselectable="on"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mtable displaystyle="true"><mlabeledtr><mtd><mtext>(9)</mtext></mtd><mtd><mtext>Intensity</mtext><mo stretchy="false">(</mo><mtext>matmul</mtext><mo stretchy="false">)</mo><mo>&gt;</mo><mtext>Intensity</mtext><mo stretchy="false">(</mo><mtext>TPU</mtext><mo stretchy="false">)</mo><mstyle scriptlevel="0"><mspace width="0.278em"></mspace></mstyle><mo stretchy="false">⟹</mo><mstyle scriptlevel="0"><mspace width="0.278em"></mspace></mstyle><mi>B</mi><mo>&gt;</mo><mfrac><mrow><mn>1.97</mn><mi>e</mi><mn>14</mn></mrow><mrow><mn>8.20</mn><mi>e</mi><mn>11</mn></mrow></mfrac><mo>=</mo><mn>240</mn></mtd></mlabeledtr></mtable></math></mjx-assistive-mml></mjx-container> </span><p>对于 Transformer 的矩阵乘法来说，这是一个合理的假设，因为我们通常有一个本地（每个副本）的批次大小 <d-math>B &lt; 1024</d-math> 个 token（<em>不是序列</em>），但 <d-math>D</d-math> 和 <d-math>F &gt; 8000</d-math>。因此，当我们的每个副本<d-footnote id="d-footnote-10">我们说“每个副本”，是因为如果我们进行某种模型分片以增加用于矩阵乘法的芯片数量，我们会将可用的计算和内存带宽按相同比例进行扩展。因此，临界批次大小对于模型的每个独立权重副本都是成立的。</d-footnote>的批次大小大于 240 个 token 时，我们通常会变得受计算限制，这是一个非常简单的规则！</p> <p class="takeaway"><strong>要点：</strong> 对于 bfloat16 矩阵乘法，要在大多数 TPU 上达到计算受限，我们的每个副本的 token 批次大小需要大于 240。<d-footnote id="d-footnote-11">请注意，这*不是*通常意义上的批次大小，即序列的数量。事实证明，大多数屋顶线模型纯粹依赖于 token 的数量，无论它们是属于相同还是不同的序列。例如，如果你在 128 个 GPU 上有 512 个序列，每个序列 4096 个 token 的批次大小，那么你的总批次大小是 `512 * 4096 = 2M` 个 token，本地批次大小是 16k 个 token。</d-footnote></p> <p>这有一些值得注意的警告，我们将在下面的问题中探讨，特别是关于量化（例如，如果我们量化了激活值但仍然进行全精度 FLOPs）。但这是一个值得记住的好规则。对于 GPU，这个数字略高（接近 300），但同样的结论通常成立。当我们<a href="https://docs.jax.dev/en/latest/pallas/tpu/matmul.html#your-first-matrix-multiplication-kernel" rel="external nofollow noopener" target="_blank">将一个大的矩阵乘法分解成更小的矩阵乘法</a>时，分块的大小也很重要。<d-footnote id="d-footnote-12">当我们进行大型矩阵乘法时，需要将其分解成更小的分块，以适应 VMEM/SMEM/TMEM 这种更高带宽的片上内存。这导致我们需要多次加载数据块，所以我们只加载 <d-math>O(N^2)</d-math> 字节的说法就不再完全正确了。考虑一个 <d-math>(m, k) \cdot (k, n)</d-math> 的矩阵乘法，分块大小为 <d-math>bm</d-math>、<d-math>bk</d-math>、<d-math>bm</d-math>。设 <d-math>tm = m / bm</d-math> 等。那么总 FLOPs 是 <d-math>2 \cdot tm \cdot tn \cdot tk \cdot m \cdot bk \cdot bm</d-math>，总字节数是 <d-math>2 \cdot tm \cdot tn \cdot (tk \cdot (bm \cdot bk + bk \cdot bn) + 2 \cdot bm \cdot bn)</d-math>。忽略最后一项，我们得到的强度是 <d-math>bm \cdot bn / (bm + bn)</d-math>，与上面的类似。</d-footnote> 我们将在<a href="tpus.html">下一节</a>中讨论更底层的 GPU 和 TPU 细节。</p> <h3 id="network-communication-rooflines">网络通信屋顶线模型</h3> <p>到目前为止，我们讨论的所有屋顶线模型都是内存带宽屋顶线模型，<em>全部在单个芯片内部</em>。这不应被视为一个规则。事实上，本书中我们关心的绝大多数屋顶线模型都涉及芯片间的通信：通常是涉及跨多个 TPU 分片的矩阵的矩阵乘法。</p> <p>举一个有点刻意的例子，假设我们想将两个大矩阵 <d-math>X\sim \text{bfloat16[B, D]}</d-math> 和 <d-math>Y \sim \text{bfloat16[D, F]}</d-math> 相乘，它们被均匀地分割在 2 个 TPU/GPU 上（沿着 <d-math>D</d-math> 维度）。要进行这个乘法（我们将在<a href="sharding.html">第 3 节</a>中看到），我们可以在每个 TPU 上乘以每个矩阵的一半（在 TPU 0 上是 <code class="language-plaintext highlighter-rouge">A = X[:, :D // 2] @ Y[:D // 2, :]</code>，在 TPU 1 上是 <code class="language-plaintext highlighter-rouge">B = X[:, D // 2:] @ Y[D // 2:, :]</code>），然后将得到的“部分和”复制到另一个 TPU 上并将它们相加。假设我们可以双向复制 <code class="language-plaintext highlighter-rouge">4.5e10</code> 字节，并在每个芯片上执行 <code class="language-plaintext highlighter-rouge">1.97e14</code> FLOPs/秒。那么 <d-math>T_\text{math}</d-math> 和 <d-math>T_\text{comms}</d-math> 是多少？</p> <p><d-math>T_\text{math}</d-math> 显然是之前的一半，因为每个 TPU 只做了一半的工作，即<d-footnote id="d-footnote-13">我们忽略了将两个部分和相加所需的 FLOPs（另外的 DF 次加法），但这基本上可以忽略不计。</d-footnote></p><span> <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="10" display="true" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX" display="true" style="margin-left: 0px; margin-right: 0px;"><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">计算</mjx-mtext></mjx-script></mjx-msub><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c22C5"></mjx-c></mjx-mo><mjx-mtext class="mjx-n" space="3">加速器 FLOPs/秒</mjx-mtext></mjx-mrow></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c2E"></mjx-c><mjx-c class="mjx-c39"></mjx-c><mjx-c class="mjx-c37"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D452 TEX-I"></mjx-c></mjx-mi><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c34"></mjx-c></mjx-mn></mjx-mrow></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac></mjx-math><mjx-assistive-mml display="block" unselectable="on"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><msub><mi>T</mi><mtext>math</mtext></msub><mo>=</mo><mfrac><mrow><mn>2</mn><mi>B</mi><mi>D</mi><mi>F</mi></mrow><mrow><mn>2</mn><mo>⋅</mo><mtext>Accelerator FLOPs/s</mtext></mrow></mfrac><mo>=</mo><mfrac><mrow><mi>B</mi><mi>D</mi><mi>F</mi></mrow><mrow><mn>1.97</mn><mi>e</mi><mn>14</mn></mrow></mfrac></math></mjx-assistive-mml></mjx-container> </span><p>那么 <d-math>T_\text{comms}</d-math> 呢？这现在指的是芯片间的通信时间！它就是发送的总字节数除以网络带宽，即</p><span> <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="11" display="true" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX" display="true" style="margin-left: 0px; margin-right: 0px;"><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">通信</mjx-mtext></mjx-script></mjx-msub><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mtext class="mjx-n">网络带宽</mjx-mtext></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c34"></mjx-c><mjx-c class="mjx-c2E"></mjx-c><mjx-c class="mjx-c35"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D452 TEX-I"></mjx-c></mjx-mi><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c30"></mjx-c></mjx-mn></mjx-mrow></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac></mjx-math><mjx-assistive-mml display="block" unselectable="on"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><msub><mi>T</mi><mtext>comms</mtext></msub><mo>=</mo><mfrac><mrow><mn>2</mn><mi>B</mi><mi>F</mi></mrow><mtext>Network Bandwidth</mtext></mfrac><mo>=</mo><mfrac><mrow><mn>2</mn><mi>B</mi><mi>F</mi></mrow><mrow><mn>4.5</mn><mi>e</mi><mn>10</mn></mrow></mfrac></math></mjx-assistive-mml></mjx-container> </span><p>因此，当我们<mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="12" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mtext class="mjx-n">强度</mjx-mtext><mjx-mo class="mjx-n"><mjx-c class="mjx-c28"></mjx-c></mjx-mo><mjx-mtext class="mjx-n">matmul (2-芯片)</mjx-mtext><mjx-mo class="mjx-n"><mjx-c class="mjx-c29"></mjx-c></mjx-mo><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3E"></mjx-c></mjx-mo><mjx-mtext class="mjx-n" space="4">强度</mjx-mtext><mjx-mo class="mjx-n"><mjx-c class="mjx-c28"></mjx-c></mjx-mo><mjx-mtext class="mjx-n">TPU (关于芯片间网络)</mjx-mtext><mjx-mo class="mjx-n"><mjx-c class="mjx-c29"></mjx-c></mjx-mo></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mtext>Intensity</mtext><mo stretchy="false">(</mo><mtext>matmul (2-chips)</mtext><mo stretchy="false">)</mo><mo>&gt;</mo><mtext>Intensity</mtext><mo stretchy="false">(</mo><mtext>TPU w.r.t. inter-chip network</mtext><mo stretchy="false">)</mo></math></mjx-assistive-mml></mjx-container>时，我们变得受计算限制（现在是相对于芯片间网络而言），或者等价于当 <d-math>\frac{BDF}{2BF} = \frac{D}{2} &gt; \frac{1.97e14}{4.5e10} = 4377</d-math> 或 <d-math>D &gt; 8755</d-math>。注意，与之前不同，临界阈值现在取决于 <d-math>D</d-math> 而不是 <d-math>B</d-math>！试着想想为什么会这样。这只是一个例子，但我们想强调的是，这种屋顶线模型对于了解何时可以在多个 TPU 上并行化一个操作至关重要。</p> <h2 id="a-few-problems-to-work">几个练习题</h2> <p><strong>问题 1 [int8 矩阵乘法]：</strong> 假设我们想用 int8 精度（每个参数 1 字节）而不是 bfloat16 来进行矩阵乘法 <d-math>X[B, D] \cdot_D Y[D, F] \rightarrow Z[B, F]</d-math>。<d-footnote id="d-footnote-14">在这里以及全文中，我们将使用符号 <d-math>A \cdot_D B</d-math> 来表示乘法是在 D 维度上进行收缩。这是对 einsum 符号的一种滥用。</d-footnote></p> <ol> <li>需要从内存加载多少字节？需要写回内存多少字节？</li> <li>总共执行了多少次操作（OPs）？</li> <li>算术强度是多少？</li> <li>对 <d-math>T_\text{math}</d-math> 和 <d-math>T_\text{comms}</d-math> 的屋顶线估计是多少？整个操作运行时间的合理上限和下限是什么？</li> </ol> <p>假设我们的 HBM 带宽是 <code class="language-plaintext highlighter-rouge">8.1e11</code> 字节/秒，我们的 int8 峰值 OPs/秒是 <code class="language-plaintext highlighter-rouge">3.94e14</code>（大约是 bfloat16 的 2 倍）。</p> <details><summary>点击此处查看答案。</summary> <ol> <li>因为我们用 int8 存储参数，每个参数有 1 字节，所以我们从 HBM 加载了 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="13" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="3"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>B</mi><mi>D</mi><mo>+</mo><mi>D</mi><mi>F</mi></math></mjx-assistive-mml></mjx-container> 字节，并写回了 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="14" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>B</mi><mi>F</mi></math></mjx-assistive-mml></mjx-container> 字节。</li> <li>这和 bfloat16 的情况一样，但理论上 int8 OPs/秒应该更快。所以这仍然是 <d-math>2BDF</d-math> FLOPs。</li> <li>算术强度是 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="15" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi><mjx-texatom texclass="ORD"><mjx-mo class="mjx-n"><mjx-c class="mjx-c2F"></mjx-c></mjx-mo></mjx-texatom><mjx-mo class="mjx-n"><mjx-c class="mjx-c28"></mjx-c></mjx-mo><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="3"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="3"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n"><mjx-c class="mjx-c29"></mjx-c></mjx-mo></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mn>2</mn><mi>B</mi><mi>D</mi><mi>F</mi><mrow data-mjx-texclass="ORD"><mo>/</mo></mrow><mo stretchy="false">(</mo><mi>B</mi><mi>D</mi><mo>+</mo><mi>D</mi><mi>F</mi><mo>+</mo><mi>B</mi><mi>F</mi><mo stretchy="false">)</mo></math></mjx-assistive-mml></mjx-container>。如果我们做出和上面关于 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="16" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c226A"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="4"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>B</mi><mo>≪</mo><mi>D</mi></math></mjx-assistive-mml></mjx-container> 和 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="17" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c226A"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="4"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>B</mi><mo>≪</mo><mi>F</mi></math></mjx-assistive-mml></mjx-container> 相同的假设，我们得到的算术强度是 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="18" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mn>2</mn><mi>B</mi></math></mjx-assistive-mml></mjx-container>，这意味着我们的规则变成了 <d-math>B &gt; \text{HBM int8 arithmetic intensity} / 2</d-math>。使用给定的数字，这个 int8 强度是 <code class="language-plaintext highlighter-rouge">3.94e14 / 8.1e11 = 486</code>，所以规则是 <d-math>B &gt; 486 / 2 = 243</d-math>。注意，这基本上没有变化！</li> <li><mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="19" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">计算</mjx-mtext></mjx-script></mjx-msub><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="4"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi><mjx-texatom texclass="ORD"><mjx-mo class="mjx-n"><mjx-c class="mjx-c2F"></mjx-c></mjx-mo></mjx-texatom><mjx-mn class="mjx-n"><mjx-c class="mjx-c33"></mjx-c><mjx-c class="mjx-c2E"></mjx-c><mjx-c class="mjx-c39"></mjx-c><mjx-c class="mjx-c34"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D452 TEX-I"></mjx-c></mjx-mi><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c34"></mjx-c></mjx-mn></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><msub><mi>T</mi><mtext>math</mtext></msub><mo>=</mo><mn>2</mn><mi>B</mi><mi>D</mi><mi>F</mi><mrow data-mjx-texclass="ORD"><mo>/</mo></mrow><mn>3.94</mn><mi>e</mi><mn>14</mn></math></mjx-assistive-mml></mjx-container> 和 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="20" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">通信</mjx-mtext></mjx-script></mjx-msub><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c28"></mjx-c></mjx-mo><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="3"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="3"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n"><mjx-c class="mjx-c29"></mjx-c></mjx-mo><mjx-texatom texclass="ORD"><mjx-mo class="mjx-n"><mjx-c class="mjx-c2F"></mjx-c></mjx-mo></mjx-texatom><mjx-mn class="mjx-n"><mjx-c class="mjx-c38"></mjx-c><mjx-c class="mjx-c2E"></mjx-c><mjx-c class="mjx-c31"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D452 TEX-I"></mjx-c></mjx-mi><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c31"></mjx-c></mjx-mn></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><msub><mi>T</mi><mtext>comms</mtext></msub><mo>=</mo><mo stretchy="false">(</mo><mi>B</mi><mi>D</mi><mo>+</mo><mi>D</mi><mi>F</mi><mo>+</mo><mi>B</mi><mi>F</mi><mo stretchy="false">)</mo><mrow data-mjx-texclass="ORD"><mo>/</mo></mrow><mn>8.1</mn><mi>e</mi><mn>11</mn></math></mjx-assistive-mml></mjx-container>，所以一个合理的下限是 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="21" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mo class="mjx-n"><mjx-c class="mjx-c6D"></mjx-c><mjx-c class="mjx-c61"></mjx-c><mjx-c class="mjx-c78"></mjx-c></mjx-mo><mjx-mo class="mjx-n"><mjx-c class="mjx-c28"></mjx-c></mjx-mo><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">计算</mjx-mtext></mjx-script></mjx-msub><mjx-mo class="mjx-n"><mjx-c class="mjx-c2C"></mjx-c></mjx-mo><mjx-msub space="2"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">通信</mjx-mtext></mjx-script></mjx-msub><mjx-mo class="mjx-n"><mjx-c class="mjx-c29"></mjx-c></mjx-mo></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mo data-mjx-texclass="OP" movablelimits="true">max</mo><mo stretchy="false">(</mo><msub><mi>T</mi><mtext>math</mtext></msub><mo>,</mo><msub><mi>T</mi><mtext>comms</mtext></msub><mo stretchy="false">)</mo></math></mjx-assistive-mml></mjx-container>，上限是 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="22" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">计算</mjx-mtext></mjx-script></mjx-msub><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-msub space="3"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-mtext class="mjx-n" size="s">通信</mjx-mtext></mjx-script></mjx-msub></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><msub><mi>T</mi><mtext>math</mtext></msub><mo>+</mo><msub><mi>T</mi><mtext>comms</mtext></msub></math></mjx-assistive-mml></mjx-container>。</li> </ol> </details> <p><strong>问题 2 [int8 + bf16 矩阵乘法]：</strong> 在实践中，我们经常对权重和激活值进行不同的量化，所以我们可能会用非常低的精度存储权重，但保持激活值（和计算）在较高的精度。假设我们想将权重用 int8 量化，但保持激活值（和计算）在 bfloat16。在多大的批次大小时我们会变得受计算限制？假设 <code class="language-plaintext highlighter-rouge">1.97e14</code> bfloat16 FLOPs/秒。</p> <p><em>提示：这具体指的是 <code class="language-plaintext highlighter-rouge">bfloat16[B, D] * int8[D, F] -&gt; bfloat16[B, F]</code>，其中 <d-math>B</d-math> 是“批次大小”。</em></p> <details><summary>点击此处查看答案。</summary> <p>再次假设 B 很小，我们有 2BDF 的 bfloat16 FLOPs，但只有 DF 的权重（而不是 bfloat16 中的 2DF）。这意味着当 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="23" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3E"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="4"><mjx-c class="mjx-c32"></mjx-c><mjx-c class="mjx-c34"></mjx-c><mjx-c class="mjx-c30"></mjx-c></mjx-mn></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mn>2</mn><mi>B</mi><mo>&gt;</mo><mn>240</mn></math></mjx-assistive-mml></mjx-container> 或 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="24" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3E"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="4"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c32"></mjx-c><mjx-c class="mjx-c30"></mjx-c></mjx-mn></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>B</mi><mo>&gt;</mo><mn>120</mn></math></mjx-assistive-mml></mjx-container> 时，我们变得受计算限制。这个值低得多，意味着如果我们能做 int8 权重量化（这相当容易做到）但仍然进行 bfloat16 FLOPs，我们就能在效率上获得有意义的提升（尽管 int8 OPs 会更好）。</p> </details> <p><strong>问题 3：</strong> 采用问题 2 的设置，绘制峰值 FLOPs 与 <d-math>B</d-math> 在 <d-math>F = D = 4096</d-math> 和 <d-math>F = D = 1024</d-math> 情况下的屋顶线图。<em>使用加载的确切字节数，而不是近似值。</em></p> <details><summary>点击此处查看答案。</summary> <p>这是所说的图：</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/roofline-plot-q3-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/roofline-plot-q3-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/roofline-plot-q3-1400.webp 1400w" type="image/webp"/> <img class="img-fluid img-small" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/roofline-plot-q3.png" width="100%"/> </picture> </figure> <p>注意，两个模型最终都达到了硬件的峰值 FLOPs/s，但更大的 D/F 更快地达到了。D=F=1024 几乎使临界批次大小翻了一番。生成此图的代码在这里：</p> <div class="language-py highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code><span class="kn">import</span> <span class="n">matplotlib.pyplot</span> <span class="k">as</span> <span class="n">plt</span>
+<span class="kn">import</span> <span class="n">numpy</span> <span class="k">as</span> <span class="n">np</span>
+
+<span class="n">bs</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="nf">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">512</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">roofline</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">F</span><span class="p">):</span>
+  <span class="n">total_flops</span> <span class="o">=</span> <span class="mi">2</span><span class="o">*</span><span class="n">B</span><span class="o">*</span><span class="n">D</span><span class="o">*</span><span class="n">F</span>
+  <span class="n">flops_time</span> <span class="o">=</span> <span class="n">total_flops</span> <span class="o">/</span> <span class="mf">1.97e14</span>
+  <span class="n">comms_time</span> <span class="o">=</span> <span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">B</span><span class="o">*</span><span class="n">D</span> <span class="o">+</span> <span class="n">D</span><span class="o">*</span><span class="n">F</span> <span class="o">+</span> <span class="mi">2</span><span class="o">*</span><span class="n">B</span><span class="o">*</span><span class="n">F</span><span class="p">)</span> <span class="o">/</span> <span class="mf">8.2e11</span>
+  <span class="n">total_time</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="nf">maximum</span><span class="p">(</span><span class="n">flops_time</span><span class="p">,</span> <span class="n">comms_time</span><span class="p">)</span>
+  <span class="k">return</span> <span class="n">total_flops</span> <span class="o">/</span> <span class="n">total_time</span>
+
+<span class="n">roofline_big</span> <span class="o">=</span> <span class="nf">roofline</span><span class="p">(</span><span class="n">bs</span><span class="p">,</span> <span class="mi">4096</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+<span class="n">roofline_small</span> <span class="o">=</span> <span class="nf">roofline</span><span class="p">(</span><span class="n">bs</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="mi">1024</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="p">.</span><span class="nf">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">plot</span><span class="p">(</span><span class="n">bs</span><span class="p">,</span> <span class="n">roofline_big</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sh">'</span><span class="s">F=D=4096</span><span class="sh">'</span><span class="p">)</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">plot</span><span class="p">(</span><span class="n">bs</span><span class="p">,</span> <span class="n">roofline_small</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sh">'</span><span class="s">F=D=1024</span><span class="sh">'</span><span class="p">)</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">xlabel</span><span class="p">(</span><span class="sh">'</span><span class="s">批次大小</span><span class="sh">'</span><span class="p">)</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">ylabel</span><span class="p">(</span><span class="sh">'</span><span class="s">TPU v5e 上的峰值 bfloat16 FLOPs/秒</span><span class="sh">'</span><span class="p">)</span>
+<span class="n">plt</span><span class="p">.</span><span class="nf">grid</span><span class="p">()</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> </details> <p><strong>问题 4：</strong> 如果我们想执行 <d-math>\text{int8[B, D]} *_D \text{int8[B, D, F]} \rightarrow \text{int8[B, F]}</d-math>，其中我们想象每个批次元素都有一个不同的矩阵。这个操作的算术强度是多少？</p> <details><summary>点击此处查看答案。</summary> <p>让我们先看看总的 FLOPs 和通信量。</p> <ol> <li>总 FLOPs：FLOPs 基本上是相同的，因为我们正在做相同数量的 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="25" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-cD7"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="3"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>B</mi><mi>D</mi><mo>×</mo><mi>D</mi><mi>F</mi></math></mjx-assistive-mml></mjx-container> 矩阵乘法（这在第 4 节中有更多讨论）。所以这只是 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="26" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mn>2</mn><mi>B</mi><mi>D</mi><mi>F</mi></math></mjx-assistive-mml></mjx-container>。</li> <li>总通信量：我们在这里有更多的通信量：<mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="27" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="3"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="3"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>B</mi><mi>D</mi><mo>+</mo><mi>B</mi><mi>D</mi><mi>F</mi><mo>+</mo><mi>B</mi><mi>F</mi></math></mjx-assistive-mml></mjx-container>。</li> <li>因此，我们的算术强度现在实际上是 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="28" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi><mjx-texatom texclass="ORD"><mjx-mo class="mjx-n"><mjx-c class="mjx-c2F"></mjx-c></mjx-mo></mjx-texatom><mjx-mo class="mjx-n"><mjx-c class="mjx-c28"></mjx-c></mjx-mo><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="3"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="3"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n"><mjx-c class="mjx-c29"></mjx-c></mjx-mo></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mn>2</mn><mi>B</mi><mi>D</mi><mi>F</mi><mrow data-mjx-texclass="ORD"><mo>/</mo></mrow><mo stretchy="false">(</mo><mi>B</mi><mi>D</mi><mo>+</mo><mi>B</mi><mi>D</mi><mi>F</mi><mo>+</mo><mi>B</mi><mi>F</mi><mo stretchy="false">)</mo></math></mjx-assistive-mml></mjx-container>。由于 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="29" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>B</mi><mi>D</mi><mi>F</mi></math></mjx-assistive-mml></mjx-container> 在分母中占主导地位，这个值大约是 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="30" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mn>2</mn></math></mjx-assistive-mml></mjx-container>。所以它不再依赖于批次大小，而是基本上是恒定的。这很糟糕，因为这意味着无论如何我们基本上总是受通信限制。</li> </ol> </details> <p><strong>问题 5 [GPU 的内存屋顶线模型]：</strong> 使用 NVIDIA 为 H100 提供的<a href="https://www.nvidia.com/en-us/data-center/h100/" rel="external nofollow noopener" target="_blank">规格表</a>，计算矩阵乘法变得受计算限制时的批次大小。<em>注意，TensorCore 的 FLOPs 数值是真实值的两倍，因为它们只有在结构化稀疏的情况下才能实现。</em></p> <details><summary>点击此处查看答案。</summary> <p>从规格表中，我们看到报告的 bfloat16 FLOPs 值为 <code class="language-plaintext highlighter-rouge">1.979e15</code> FLOPs/秒，并带有一个星号注明“带稀疏性”。没有稀疏性的真实值是这个的一半，意味着接近 <code class="language-plaintext highlighter-rouge">1e15</code> FLOPs/秒。内存带宽是 3.35TB/秒，或 <code class="language-plaintext highlighter-rouge">3.35e12</code> 字节/秒。因此 <d-math>B_\text{crit}</d-math> 是 <code class="language-plaintext highlighter-rouge">1e15 / 3.35e12 = 298</code>，与 TPU 相当类似。</p> </details> <h3 class="next-section">第 1 部分到此结束！要了解第 2 部分，即真实 TPU 如何处理 FLOPs 和通信，<a href="tpus.html">点击这里</a>。</h3> </d-article> <d-appendix>
+<style>
+
+d-appendix {
+  contain: layout style;
+  font-size: 0.8em;
+  line-height: 1.7em;
+  margin-top: 60px;
+  margin-bottom: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  color: rgba(0,0,0,0.5);
+  padding-top: 60px;
+  padding-bottom: 48px;
+}
+
+d-appendix h3 {
+  grid-column: page-start / text-start;
+  font-size: 15px;
+  font-weight: 500;
+  margin-top: 1em;
+  margin-bottom: 0;
+  color: rgba(0,0,0,0.65);
+}
+
+d-appendix h3 + * {
+  margin-top: 1em;
+}
+
+d-appendix ol {
+  padding: 0 0 0 15px;
+}
+
+@media (min-width: 768px) {
+  d-appendix ol {
+    padding: 0 0 0 30px;
+    margin-left: -30px;
+  }
+}
+
+d-appendix li {
+  margin-bottom: 1em;
+}
+
+d-appendix a {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+d-appendix > * {
+  grid-column: text;
+}
+
+d-appendix > d-footnote-list,
+d-appendix > d-citation-list,
+d-appendix > distill-appendix {
+  grid-column: screen;
+}
+
+</style>
+<d-footnote-list style="">
+<style>
+
+d-footnote-list {
+  contain: layout style;
+}
+
+d-footnote-list > * {
+  grid-column: text;
+}
+
+d-footnote-list a.footnote-backlink {
+  color: rgba(0,0,0,0.3);
+  padding-left: 0.5em;
+}
+
+</style>
+<h3>脚注</h3>
+<ol><li id="d-footnote-1-listing">bf16 是 <a href="https://en.wikipedia.org/wiki/Bfloat16_floating-point_format" rel="external nofollow noopener" target="_blank">bfloat16</a> 的缩写，一种常用于机器学习的 16 位浮点格式。<a class="footnote-backlink" href="#d-footnote-1">[↩]</a></li><li id="d-footnote-2-listing">H100 和 B200 通常只能达到声称的峰值 FLOPs 的 80-85% 左右，而 TPU 在正常使用中可以接近 95%。<a class="footnote-backlink" href="#d-footnote-2">[↩]</a></li><li id="d-footnote-3-listing">请注意，这些芯片的定价不同，此比较未按成本进行归一化。<a class="footnote-backlink" href="#d-footnote-3">[↩]</a></li><li id="d-footnote-4-listing">NVIDIA 也称之为“内存带宽”。<a class="footnote-backlink" href="#d-footnote-4">[↩]</a></li><li id="d-footnote-5-listing">MXU 是 TPU 上的矩阵乘法单元。我们在这里特别指出，是因为 TPU 还有其他加速器，如 VPU，它负责元素级操作，具有不同的峰值 FLOPs/秒。<a class="footnote-backlink" href="#d-footnote-5">[↩]</a></li><li id="d-footnote-6-listing">这仅在算法从 HBM 加载权重并在 MXU 中运行时才成立。正如我们将在下一节讨论的，我们有时可以将参数存储在具有更高带宽的 VMEM 中。许多算法也在 VPU 中运行，它具有不同的性能特征。<a class="footnote-backlink" href="#d-footnote-6">[↩]</a></li><li id="d-footnote-7-listing">上面 240 这个数字在这里不是一个正确的比较，因为正如你将在下一节看到的，点积是在 VPU 而非 MXU 上执行的。TPU v5p VPU 每秒大约可以执行 7e12 FLOPs，所以它的临界强度大约是 3，这意味着在这里我们仍然有些受通信限制。无论如何，我们的强度低且恒定这一事实意味着在大多数硬件上都很难达到计算受限。<a class="footnote-backlink" href="#d-footnote-7">[↩]</a></li><li id="d-footnote-8-listing">技术上讲，我们执行 <d-math>BF \times (2D - 1)</d-math> FLOPs，但这已经足够接近了。这来自于 <d-math>BDF</d-math> 次乘法和 <d-math>BF * (D-1)</d-math> 次加法。第 4 节有更多细节。<a class="footnote-backlink" href="#d-footnote-8">[↩]</a></li><li id="d-footnote-9-listing">虽然矩阵乘法的输出技术上是 float32，但我们通常在复制回 HBM 之前将其转换为 bfloat16。<a class="footnote-backlink" href="#d-footnote-9">[↩]</a></li><li id="d-footnote-10-listing">我们说“每个副本”，是因为如果我们进行某种模型分片以增加用于矩阵乘法的芯片数量，我们会将可用的计算和内存带宽按相同比例进行扩展。因此，临界批次大小对于模型的每个独立权重副本都是成立的。<a class="footnote-backlink" href="#d-footnote-10">[↩]</a></li><li id="d-footnote-11-listing">请注意，这*不是*通常意义上的批次大小，即序列的数量。事实证明，大多数屋顶线模型纯粹依赖于 token 的数量，无论它们是属于相同还是不同的序列。例如，如果你在 128 个 GPU 上有 512 个序列，每个序列 4096 个 token 的批次大小，那么你的总批次大小是 `512 * 4096 = 2M` 个 token，本地批次大小是 16k 个 token。<a class="footnote-backlink" href="#d-footnote-11">[↩]</a></li><li id="d-footnote-12-listing">当我们进行大型矩阵乘法时，需要将其分解成更小的分块，以适应 VMEM/SMEM/TMEM 这种更高带宽的片上内存。这导致我们需要多次加载数据块，所以我们只加载 <d-math>O(N^2)</d-math> 字节的说法就不再完全正确了。考虑一个 <d-math>(m, k) \cdot (k, n)</d-math> 的矩阵乘法，分块大小为 <d-math>bm</d-math>、<d-math>bk</d-math>、<d-math>bm</d-math>。设 <d-math>tm = m / bm</d-math> 等。那么总 FLOPs 是 <d-math>2 \cdot tm \cdot tn \cdot tk \cdot m \cdot bk \cdot bm</d-math>，总字节数是 <d-math>2 \cdot tm \cdot tn \cdot (tk \cdot (bm \cdot bk + bk \cdot bn) + 2 \cdot bm \cdot bn)</d-math>。忽略最后一项，我们得到的强度是 <d-math>bm \cdot bn / (bm + bn)</d-math>，与上面的类似。<a class="footnote-backlink" href="#d-footnote-12">[↩]</a></li><li id="d-footnote-13-listing">我们忽略了将两个部分和相加所需的 FLOPs（另外的 DF 次加法），但这基本上可以忽略不计。<a class="footnote-backlink" href="#d-footnote-13">[↩]</a></li><li id="d-footnote-14-listing">在这里以及全文中，我们将使用符号 <d-math>A \cdot_D B</d-math> 来表示乘法是在 D 维度上进行收缩。这是对 einsum 符号的一种滥用。<a class="footnote-backlink" href="#d-footnote-14">[↩]</a></li></ol>
+</d-footnote-list> <d-citation-list style="display: none;"></d-citation-list> <div class="base-grid appendix-entry"> <h3 style="grid-column: 0;">杂项</h3> <p class="author-footnote" style="grid-column: text;"><sup>*</sup>工作于 Google DeepMind 完成，现就职于 MatX。</p> </div> <div class="base-grid appendix-entry"> <h3 style="grid-column: 0;">引用</h3> <p class="author-footnote">在学术背景下进行引用，请按如下方式引用此作品：</p> <div class="author-footnote"> <div class="language-bibtex highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code>    <span class="c">Austin et al., "How to Scale Your Model", Google DeepMind, online, 2025.</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> </div> <p class="author-footnote">或作为 BibTeX 条目：</p> <div class="author-footnote"> <div class="language-bibtex highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code>    <span class="nc">@article</span><span class="p">{</span><span class="nl">scaling-book</span><span class="p">,</span>
+      <span class="na">title</span> <span class="p">=</span> <span class="s">{How to Scale Your Model}</span><span class="p">,</span>
+      <span class="na">author</span> <span class="p">=</span> <span class="s">{Austin, Jacob and Douglas, Sholto and Frostig, Roy and Levskaya, Anselm and Chen, Charlie and Vikram, Sharad
+      and Lebron, Federico and Choy, Peter and Ramasesh, Vinay and Webson, Albert and Pope, Reiner}</span><span class="p">,</span>
+      <span class="na">publisher</span> <span class="p">=</span> <span class="s">{Google DeepMind}</span><span class="p">,</span>
+      <span class="na">howpublished</span> <span class="p">=</span> <span class="s">{Online}</span><span class="p">,</span>
+      <span class="na">note</span> <span class="p">=</span> <span class="s">{Retrieved from https://jax-ml.github.io/scaling-book/}</span><span class="p">,</span>
+      <span class="na">year</span> <span class="p">=</span> <span class="s">{2025}</span>
+    <span class="p">}</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> </div> </div> </d-appendix> <d-bibliography src="/scaling-book/assets/bibliography/main.bib"></d-bibliography> <div id="giscus_thread" style="max-width: 930px; margin: 0 auto;"> <script>
+      let giscusTheme = determineComputedTheme();
+      let giscusAttributes = {
+        src: 'https://giscus.app/client.js',
+        'data-repo': 'jax-ml/scaling-book',
+        'data-repo-id': '',
+        'data-category': 'General',
+        'data-category-id': '',
+        'data-mapping': 'title',
+        'data-strict': '0',
+        'data-reactions-enabled': '1',
+        'data-emit-metadata': '0',
+        'data-input-position': 'bottom',
+        'data-theme': giscusTheme,
+        'data-loading': '1',
+        'data-lang': 'en',
+        crossorigin: 'anonymous',
+        async: '',
+      };
+
+      let giscusScript = document.createElement('script');
+      Object.entries(giscusAttributes).forEach(([key, value]) => giscusScript.setAttribute(key, value));
+      document.getElementById('giscus_thread').appendChild(giscusScript);
+    </script><script async="" crossorigin="anonymous" data-category="General" data-category-id="" data-emit-metadata="0" data-input-position="bottom" data-lang="en" data-loading="1" data-mapping="title" data-reactions-enabled="1" data-repo="jax-ml/scaling-book" data-repo-id="" data-strict="0" data-theme="light" src="https://giscus.app/client.js"></script><div class="giscus"><iframe allow="clipboard-write" class="giscus-frame giscus-frame--loading" scrolling="no" src="https://giscus.app/en/widget?origin=https%3A%2F%2Fjax-ml.github.io%2Fscaling-book%2Froofline%2F&amp;session=&amp;theme=light&amp;reactionsEnabled=1&amp;emitMetadata=0&amp;inputPosition=bottom&amp;repo=jax-ml%2Fscaling-book&amp;repoId=&amp;category=General&amp;categoryId=&amp;strict=0&amp;description=When+we+run+algorithms+on+hardware%2C+we%27re+bounded+by+three+things%3A+how+fast+our+computer+can+do+math+%28OPs%2Fsecond%29%2C+the+bandwidth+available+for+moving+data+around+%28bytes%2Fsecond%29%2C+and+the+total+memory+available+to+store+data+%28bytes%29.+These+%E2%80%9Croofline%E2%80%9D+constraints+let+us+upper+and+lower+bound+the+time+of+a+given+computation.&amp;backLink=https%3A%2F%2Fjax-ml.github.io%2Fscaling-book%2Froofline%2F&amp;term=All+About+Rooflines+%7C+How+To+Scale+Your+Model" style="opacity: 0;" title="Comments"></iframe></div> <noscript>请启用 JavaScript 以查看 <a href="http://giscus.app/?ref_noscript" rel="external nofollow noopener" target="_blank">由 giscus 支持的评论。</a> </noscript> </div> </div> <footer class="sticky-bottom mt-5" role="contentinfo"> <div class="container"> © 版权所有 2025。由 <a href="https://jekyllrb.com/" rel="external nofollow noopener" target="_blank">Jekyll</a> 使用 <a href="https://github.com/alshedivat/al-folio" rel="external nofollow noopener" target="_blank">al-folio</a> 主题强力驱动。托管于 <a href="https://pages.github.com/" rel="external nofollow noopener" target="_blank">GitHub Pages</a>。 </div> </footer> <script crossorigin="anonymous" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/bootstrap.bundle.min.js"></script> <script crossorigin="anonymous" integrity="sha256-NdbiivsvWt7VYCt6hYNT3h/th9vSTL4EDWeGs5SN3DA=" src="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/js/mdb.min.js"></script> <script crossorigin="anonymous" defer="" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" src="https://cdn.jsdelivr.net/npm/medium-zoom@1.1.0/dist/medium-zoom.min.js"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/zoom.js?85ddb88934d28b74e78031fd54cf8308"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/no_defer.js?2781658a0a2b13ed609542042a859126"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/common.js?e0514a05c5c95ac1a93a8dfd5249b92e"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/copy_code.js?12775fdf7f95e901d7119054556e495f" type="text/javascript"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/jupyter_new_tab.js?d9f17b6adc2311cbabd747f4538bb15f"></script> <script crossorigin="anonymous" defer="" id="MathJax-script" integrity="sha256-MASABpB4tYktI2Oitl4t+78w/lyA+D7b/s9GEP0JOGI=" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" type="text/javascript"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/mathjax-setup.js?70d799092f862ad98c7876aa47712e20"></script> <script crossorigin="anonymous" defer="" src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/progress-bar.js?2f30e0e6801ea8f5036fa66e1ab0a71a" type="text/javascript"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/vanilla-back-to-top.min.js?f40d453793ff4f64e238e420181a1d17"></script> <script>
+    addBackToTop();
+  </script><div class="hidden" id="back-to-top"><svg viewbox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg></div> <div class="hiddendiv common"></div></body>
+</html>

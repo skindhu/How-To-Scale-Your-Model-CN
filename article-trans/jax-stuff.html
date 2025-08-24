@@ -1,0 +1,1844 @@
+<!DOCTYPE html>
+
+<html class="transition" data-theme="light" data-theme-setting="system" lang="zh-CN">
+<head><link href="https://giscus.app/default.css" id="giscus-css" rel="stylesheet"/><style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:20px;margin:11px auto 0;width:20px}#back-to-top.hidden{bottom:-56px;opacity:0}</style> <meta content="text/html; charset=utf-8" http-equiv="Content-Type"/> <meta charset="utf-8"/> <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport"/> <meta content="IE=edge" http-equiv="X-UA-Compatible"/> <title>JAX TPU 编程：如何扩展您的模型</title> <meta content=" " name="author"/> <meta content="了解如何使用 JAX 高效地为 TPU 编程！本节大部分内容摘自&lt;a href='https://jax.readthedocs.io/en/latest/jep/14273-shard-map.html'&gt;此处&lt;/a&gt;。您可以在 &lt;a href='https://colab.sandbox.google.com/'&gt;Google Colab&lt;/a&gt; 上使用免费的 TPU 运行本节中的代码示例。" name="description"/> <meta content="scaling, jax, llms, transformers, tpus, google, deepmind, parallelism, pallas" name="keywords"/> <link href="https://jax-ml.github.io/scaling-book/assets/css/bootstrap.min.css?a4b3f509e79c54a512b890d73235ef04" rel="stylesheet"/> <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/css/mdb.min.css" integrity="sha256-jpjYvU3G3N6nrrBwXJoVEYI/0zw8htfFnhT9ljN3JJw=" rel="stylesheet"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/academicons.min.css?f0b7046b84e425c55f3463ac249818f5" rel="stylesheet"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/scholar-icons.css?62b2ac103a88034e6882a5be5f3e2772" rel="stylesheet"/> <link defer="" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Roboto+Slab:100,300,400,500,700|Material+Icons&amp;display=swap" rel="stylesheet" type="text/css"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/jekyll-pygments-themes-vs.css?4ee1a2facd1a8a76347f4bd43a740500" id="highlight_theme_light" media="" rel="stylesheet"/> <link href="https://jax-ml.github.io/scaling-book/assets/img/favicon.png?fddbd8c2ec231ba2060e67c85de32a55" rel="shortcut icon"/> <link href="https://jax-ml.github.io/scaling-book/assets/css/main.css?d41d8cd98f00b204e9800998ecf8427e" rel="stylesheet"/> <link href="jax-stuff.html" rel="canonical"/> <style id="distill-prerendered-styles" type="text/css">/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+html {
+  font-size: 14px;
+	line-height: 1.6em;
+  /* font-family: "Libre Franklin", "Helvetica Neue", sans-serif; */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
+  /*, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";*/
+  text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media(min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: #004276;
+}
+
+figure {
+  margin: 0;
+}
+
+table {
+	border-collapse: collapse;
+	border-spacing: 0;
+}
+
+table th {
+	text-align: left;
+}
+
+table thead {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+table thead th {
+  padding-bottom: 0.5em;
+}
+
+table tbody :first-child td {
+  padding-top: 0.5em;
+}
+
+pre {
+  overflow: auto;
+  max-width: 100%;
+}
+
+p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+sup, sub {
+  vertical-align: baseline;
+  position: relative;
+  top: -0.4em;
+  line-height: 1em;
+}
+
+sub {
+  top: 0.4em;
+}
+
+.kicker,
+.marker {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+
+/* Headline */
+
+@media(min-width: 1024px) {
+  d-title h1 span {
+    display: block;
+  }
+}
+
+/* Figure */
+
+figure {
+  position: relative;
+  margin-bottom: 2.5em;
+  margin-top: 1.5em;
+}
+
+figcaption+figure {
+
+}
+
+figure img {
+  width: 100%;
+}
+
+figure svg text,
+figure svg tspan {
+}
+
+figcaption,
+.figcaption {
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 12px;
+  line-height: 1.5em;
+}
+
+@media(min-width: 1024px) {
+figcaption,
+.figcaption {
+    font-size: 13px;
+  }
+}
+
+figure.external img {
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.1);
+  padding: 18px;
+  box-sizing: border-box;
+}
+
+figcaption a {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+figcaption b,
+figcaption strong, {
+  font-weight: 600;
+  color: rgba(0, 0, 0, 1.0);
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@supports not (display: grid) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    display: block;
+    padding: 8px;
+  }
+}
+
+.base-grid,
+distill-header,
+d-title,
+d-abstract,
+d-article,
+d-appendix,
+distill-appendix,
+d-byline,
+d-footnote-list,
+d-citation-list,
+distill-footer {
+  display: grid;
+  justify-items: stretch;
+  grid-template-columns: [screen-start] 8px [page-start kicker-start text-start gutter-start middle-start] 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr [text-end page-end gutter-end kicker-end middle-end] 8px [screen-end];
+  grid-column-gap: 8px;
+}
+
+.grid {
+  display: grid;
+  grid-column-gap: 8px;
+}
+
+@media(min-width: 768px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start middle-start text-start] 45px 45px 45px 45px 45px 45px 45px 45px [ kicker-end text-end gutter-start] 45px [middle-end] 45px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 16px;
+  }
+
+  .grid {
+    grid-column-gap: 16px;
+  }
+}
+
+@media(min-width: 1000px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start] 50px [middle-start] 50px [text-start kicker-end] 50px 50px 50px 50px 50px 50px 50px 50px [text-end gutter-start] 50px [middle-end] 50px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 16px;
+  }
+
+  .grid {
+    grid-column-gap: 16px;
+  }
+}
+
+@media(min-width: 1180px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start] 60px [middle-start] 60px [text-start kicker-end] 60px 60px 60px 60px 60px 60px 60px 60px [text-end gutter-start] 60px [middle-end] 60px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 32px;
+  }
+
+  .grid {
+    grid-column-gap: 32px;
+  }
+}
+
+
+
+
+.base-grid {
+  grid-column: screen;
+}
+
+/* .l-body,
+d-article > *  {
+  grid-column: text;
+}
+
+.l-page,
+d-title > *,
+d-figure {
+  grid-column: page;
+} */
+
+.l-gutter {
+  grid-column: gutter;
+}
+
+.l-text,
+.l-body {
+  grid-column: text;
+}
+
+.l-page {
+  grid-column: page;
+}
+
+.l-body-outset {
+  grid-column: middle;
+}
+
+.l-page-outset {
+  grid-column: page;
+}
+
+.l-screen {
+  grid-column: screen;
+}
+
+.l-screen-inset {
+  grid-column: screen;
+  padding-left: 16px;
+  padding-left: 16px;
+}
+
+
+/* Aside */
+
+d-article aside {
+  grid-column: gutter;
+  font-size: 12px;
+  line-height: 1.6em;
+  color: rgba(0, 0, 0, 0.6)
+}
+
+@media(min-width: 768px) {
+  aside {
+    grid-column: gutter;
+  }
+
+  .side {
+    grid-column: gutter;
+  }
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-title {
+  padding: 2rem 0 1.5rem;
+  contain: layout style;
+  overflow-x: hidden;
+}
+
+@media(min-width: 768px) {
+  d-title {
+    padding: 4rem 0 1.5rem;
+  }
+}
+
+d-title h1 {
+  grid-column: text;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.1em;
+  margin: 0 0 0.5rem;
+}
+
+@media(min-width: 768px) {
+  d-title h1 {
+    font-size: 50px;
+  }
+}
+
+d-title p {
+  font-weight: 300;
+  font-size: 1.2rem;
+  line-height: 1.55em;
+  grid-column: text;
+}
+
+d-title .status {
+  margin-top: 0px;
+  font-size: 12px;
+  color: #009688;
+  opacity: 0.8;
+  grid-column: kicker;
+}
+
+d-title .status span {
+  line-height: 1;
+  display: inline-block;
+  padding: 6px 0;
+  border-bottom: 1px solid #80cbc4;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-byline {
+  contain: style;
+  overflow: hidden;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  font-size: 0.8rem;
+  line-height: 1.8em;
+  padding: 1.5rem 0;
+  min-height: 1.8em;
+}
+
+
+d-byline .byline {
+  grid-template-columns: 1fr 1fr;
+  grid-column: text;
+}
+
+@media(min-width: 768px) {
+  d-byline .byline {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+  }
+}
+
+d-byline .authors-affiliations {
+  grid-column-end: span 3;
+  grid-template-columns: 1fr 1fr 1fr;
+  margin-bottom: 1em;
+}
+
+@media(min-width: 768px) {
+  d-byline .authors-affiliations {
+    margin-bottom: 0;
+  }
+}
+
+d-byline h3 {
+  font-size: 0.6rem;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.5);
+  margin: 0;
+  text-transform: uppercase;
+}
+
+d-byline p {
+  margin: 0;
+}
+
+d-byline a,
+d-article d-byline a {
+  color: rgba(0, 0, 0, 0.8);
+  text-decoration: none;
+  border-bottom: none;
+}
+
+d-article d-byline a:hover {
+  text-decoration: underline;
+  border-bottom: none;
+}
+
+d-byline p.author {
+  font-weight: 500;
+}
+
+d-byline .affiliations {
+
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-article {
+  contain: layout style;
+ border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding-top: 2rem;
+  color: rgba(0, 0, 0, 0.8);
+}
+
+d-article > * {
+  grid-column: text;
+}
+
+@media(min-width: 768px) {
+  d-article {
+    font-size: 16px;
+  }
+}
+
+@media(min-width: 1024px) {
+  d-article {
+    font-size: 1.06rem;
+    line-height: 1.7em;
+  }
+}
+
+
+/* H2 */
+
+
+d-article .marker {
+  text-decoration: none;
+  border: none;
+  counter-reset: section;
+  grid-column: kicker;
+  line-height: 1.7em;
+}
+
+d-article .marker:hover {
+  border: none;
+}
+
+d-article .marker span {
+  padding: 0 3px 4px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  position: relative;
+  top: 4px;
+}
+
+d-article .marker:hover span {
+  color: rgba(0, 0, 0, 0.7);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.7);
+}
+
+d-article h2 {
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 1.25em;
+  margin: 2rem 0 1.5rem 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  padding-bottom: 1rem;
+}
+
+@media(min-width: 1024px) {
+  d-article h2 {
+    font-size: 36px;
+  }
+}
+
+/* H3 */
+
+d-article h3 {
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.4em;
+  margin-bottom: 1em;
+  margin-top: 2em;
+}
+
+@media(min-width: 1024px) {
+  d-article h3 {
+    font-size: 20px;
+  }
+}
+
+/* H4 */
+
+d-article h4 {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 14px;
+  line-height: 1.4em;
+}
+
+d-article a {
+  color: inherit;
+}
+
+d-article p,
+d-article ul,
+d-article ol,
+d-article blockquote {
+  margin-top: 0;
+  margin-bottom: 1em;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+d-article blockquote {
+  border-left: 2px solid rgba(0, 0, 0, 0.2);
+  padding-left: 2em;
+  font-style: italic;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+d-article a {
+  border-bottom: 1px solid var(--global-underline-color);
+  text-decoration: none;
+}
+
+d-article a:hover {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.8);
+}
+
+d-article .link {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+d-article ul,
+d-article ol {
+  padding-left: 24px;
+}
+
+d-article li {
+  margin-bottom: 1em;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+d-article li:last-child {
+  margin-bottom: 0;
+}
+
+d-article pre {
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+d-article hr {
+  grid-column: screen;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  margin-top: 60px;
+  margin-bottom: 60px;
+}
+
+d-article section {
+  margin-top: 60px;
+  margin-bottom: 60px;
+}
+
+d-article span.equation-mimic {
+  font-family: georgia;
+  font-size: 115%;
+  font-style: italic;
+}
+
+d-article > d-code,
+d-article section > d-code  {
+  display: block;
+}
+
+d-article > d-math[block],
+d-article section > d-math[block]  {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  d-article > d-code,
+  d-article section > d-code,
+  d-article > d-math[block],
+  d-article section > d-math[block] {
+      overflow-x: scroll;
+      -ms-overflow-style: none;  // IE 10+
+      overflow: -moz-scrollbars-none;  // Firefox
+  }
+
+  d-article > d-code::-webkit-scrollbar,
+  d-article section > d-code::-webkit-scrollbar,
+  d-article > d-math[block]::-webkit-scrollbar,
+  d-article section > d-math[block]::-webkit-scrollbar {
+    display: none;  // Safari and Chrome
+  }
+}
+
+d-article .citation {
+  color: #668;
+  cursor: pointer;
+}
+
+d-include {
+  width: auto;
+  display: block;
+}
+
+d-figure {
+  contain: layout style;
+}
+
+/* KaTeX */
+
+.katex, .katex-prerendered {
+  contain: style;
+  display: inline-block;
+}
+
+/* Tables */
+
+d-article table {
+  border-collapse: collapse;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+d-article table th {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+d-article table td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+d-article table tr:last-of-type td {
+  border-bottom: none;
+}
+
+d-article table th,
+d-article table td {
+  font-size: 15px;
+  padding: 2px 8px;
+}
+
+d-article table tbody :first-child td {
+  padding-top: 2px;
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+span.katex-display {
+  text-align: left;
+  padding: 8px 0 8px 0;
+  margin: 0.5em 0 0.5em 1em;
+}
+
+span.katex {
+  -webkit-font-smoothing: antialiased;
+;
+  font-size: 1.18em;
+}
+
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@media print {
+
+  @page {
+    size: 8in 11in;
+    @bottom-right {
+      content: counter(page) " of " counter(pages);
+    }
+  }
+
+  html {
+    /* no general margins -- CSS Grid takes care of those */
+  }
+
+  p, code {
+    page-break-inside: avoid;
+  }
+
+  h2, h3 {
+    page-break-after: avoid;
+  }
+
+  d-header {
+    visibility: hidden;
+  }
+
+  d-footer {
+    display: none!important;
+  }
+
+}
+</style><script src="https://jax-ml.github.io/scaling-book/assets/js/theme.js?9a0c749ec5240d9cda97bc72359a72c0"></script> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/jekyll-pygments-themes-native.css?5847e5ed4a4568527aa6cfab446049ca" id="highlight_theme_dark" media="none" rel="stylesheet"/> <script>
+    initTheme();
+  </script> <script src="https://jax-ml.github.io/scaling-book/assets/js/distillpub/template.v2.js"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/distillpub/transforms.v2.js"></script> <style type="text/css">{{page._styles}}</style> <style type="text/css">/* Chart.js */
+@-webkit-keyframes chartjs-render-animation{from{opacity:0.99}to{opacity:1}}@keyframes chartjs-render-animation{from{opacity:0.99}to{opacity:1}}.chartjs-render-monitor{-webkit-animation:chartjs-render-animation 0.001s;animation:chartjs-render-animation 0.001s;}</style><style type="text/css">.medium-zoom-overlay{position:fixed;top:0;right:0;bottom:0;left:0;opacity:0;transition:opacity .3s;will-change:opacity}.medium-zoom--opened .medium-zoom-overlay{cursor:pointer;cursor:zoom-out;opacity:1}.medium-zoom-image{cursor:pointer;cursor:zoom-in;transition:transform .3s cubic-bezier(.2,0,.2,1)!important}.medium-zoom-image--hidden{visibility:hidden}.medium-zoom-image--opened{position:relative;cursor:pointer;cursor:zoom-out;will-change:transform}</style><style type="text/css">.CtxtMenu_InfoClose {  top:.2em; right:.2em;}
+.CtxtMenu_InfoContent {  overflow:auto; text-align:left; font-size:80%;  padding:.4em .6em; border:1px inset; margin:1em 0px;  max-height:20em; max-width:30em; background-color:#EEEEEE;  white-space:normal;}
+.CtxtMenu_Info.CtxtMenu_MousePost {outline:none;}
+.CtxtMenu_Info {  position:fixed; left:50%; width:auto; text-align:center;  border:3px outset; padding:1em 2em; background-color:#DDDDDD;  color:black;  cursor:default; font-family:message-box; font-size:120%;  font-style:normal; text-indent:0; text-transform:none;  line-height:normal; letter-spacing:normal; word-spacing:normal;  word-wrap:normal; white-space:nowrap; float:none; z-index:201;  border-radius: 15px;                     /* Opera 10.5 and IE9 */  -webkit-border-radius:15px;               /* Safari and Chrome */  -moz-border-radius:15px;                  /* Firefox */  -khtml-border-radius:15px;                /* Konqueror */  box-shadow:0px 10px 20px #808080;         /* Opera 10.5 and IE9 */  -webkit-box-shadow:0px 10px 20px #808080; /* Safari 3 & Chrome */  -moz-box-shadow:0px 10px 20px #808080;    /* Forefox 3.5 */  -khtml-box-shadow:0px 10px 20px #808080;  /* Konqueror */  filter:progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color="gray", Positive="true"); /* IE */}
+</style><style type="text/css">.CtxtMenu_MenuClose {  position:absolute;  cursor:pointer;  display:inline-block;  border:2px solid #AAA;  border-radius:18px;  -webkit-border-radius: 18px;             /* Safari and Chrome */  -moz-border-radius: 18px;                /* Firefox */  -khtml-border-radius: 18px;              /* Konqueror */  font-family: "Courier New", Courier;  font-size:24px;  color:#F0F0F0}
+.CtxtMenu_MenuClose span {  display:block; background-color:#AAA; border:1.5px solid;  border-radius:18px;  -webkit-border-radius: 18px;             /* Safari and Chrome */  -moz-border-radius: 18px;                /* Firefox */  -khtml-border-radius: 18px;              /* Konqueror */  line-height:0;  padding:8px 0 6px     /* may need to be browser-specific */}
+.CtxtMenu_MenuClose:hover {  color:white!important;  border:2px solid #CCC!important}
+.CtxtMenu_MenuClose:hover span {  background-color:#CCC!important}
+.CtxtMenu_MenuClose:hover:focus {  outline:none}
+</style><style type="text/css">.CtxtMenu_Menu {  position:absolute;  background-color:white;  color:black;  width:auto; padding:5px 0px;  border:1px solid #CCCCCC; margin:0; cursor:default;  font: menu; text-align:left; text-indent:0; text-transform:none;  line-height:normal; letter-spacing:normal; word-spacing:normal;  word-wrap:normal; white-space:nowrap; float:none; z-index:201;  border-radius: 5px;                     /* Opera 10.5 and IE9 */  -webkit-border-radius: 5px;             /* Safari and Chrome */  -moz-border-radius: 5px;                /* Firefox */  -khtml-border-radius: 5px;              /* Konqueror */  box-shadow:0px 10px 20px #808080;         /* Opera 10.5 and IE9 */  -webkit-box-shadow:0px 10px 20px #808080; /* Safari 3 & Chrome */  -moz-box-shadow:0px 10px 20px #808080;    /* Forefox 3.5 */  -khtml-box-shadow:0px 10px 20px #808080;  /* Konqueror */}
+.CtxtMenu_MenuItem {  padding: 1px 2em;  background:transparent;}
+.CtxtMenu_MenuArrow {  position:absolute; right:.5em; padding-top:.25em; color:#666666;  font-family: null; font-size: .75em}
+.CtxtMenu_MenuActive .CtxtMenu_MenuArrow {color:white}
+.CtxtMenu_MenuArrow.CtxtMenu_RTL {left:.5em; right:auto}
+.CtxtMenu_MenuCheck {  position:absolute; left:.7em;  font-family: null}
+.CtxtMenu_MenuCheck.CtxtMenu_RTL { right:.7em; left:auto }
+.CtxtMenu_MenuRadioCheck {  position:absolute; left: .7em;}
+.CtxtMenu_MenuRadioCheck.CtxtMenu_RTL {  right: .7em; left:auto}
+.CtxtMenu_MenuInputBox {  padding-left: 1em; right:.5em; color:#666666;  font-family: null;}
+.CtxtMenu_MenuInputBox.CtxtMenu_RTL {  left: .1em;}
+.CtxtMenu_MenuComboBox {  left:.1em; padding-bottom:.5em;}
+.CtxtMenu_MenuSlider {  left: .1em;}
+.CtxtMenu_SliderValue {  position:absolute; right:.1em; padding-top:.25em; color:#333333;  font-size: .75em}
+.CtxtMenu_SliderBar {  outline: none; background: #d3d3d3}
+.CtxtMenu_MenuLabel {  padding: 1px 2em 3px 1.33em;  font-style:italic}
+.CtxtMenu_MenuRule {  border-top: 1px solid #DDDDDD;  margin: 4px 3px;}
+.CtxtMenu_MenuDisabled {  color:GrayText}
+.CtxtMenu_MenuActive {  background-color: #606872;  color: white;}
+.CtxtMenu_MenuDisabled:focus {  background-color: #E8E8E8}
+.CtxtMenu_MenuLabel:focus {  background-color: #E8E8E8}
+.CtxtMenu_ContextMenu:focus {  outline:none}
+.CtxtMenu_ContextMenu .CtxtMenu_MenuItem:focus {  outline:none}
+.CtxtMenu_SelectionMenu {  position:relative; float:left;  border-bottom: none; -webkit-box-shadow:none; -webkit-border-radius:0px; }
+.CtxtMenu_SelectionItem {  padding-right: 1em;}
+.CtxtMenu_Selection {  right: 40%; width:50%; }
+.CtxtMenu_SelectionBox {  padding: 0em; max-height:20em; max-width: none;  background-color:#FFFFFF;}
+.CtxtMenu_SelectionDivider {  clear: both; border-top: 2px solid #000000;}
+.CtxtMenu_Menu .CtxtMenu_MenuClose {  top:-10px; left:-10px}
+</style><style id="MJX-CHTML-styles">
+mjx-container[jax="CHTML"] {
+  line-height: 0;
+}
+
+mjx-container [space="1"] {
+  margin-left: .111em;
+}
+
+mjx-container [space="2"] {
+  margin-left: .167em;
+}
+
+mjx-container [space="3"] {
+  margin-left: .222em;
+}
+
+mjx-container [space="4"] {
+  margin-left: .278em;
+}
+
+mjx-container [space="5"] {
+  margin-left: .333em;
+}
+
+mjx-container [rspace="1"] {
+  margin-right: .111em;
+}
+
+mjx-container [rspace="2"] {
+  margin-right: .167em;
+}
+
+mjx-container [rspace="3"] {
+  margin-right: .222em;
+}
+
+mjx-container [rspace="4"] {
+  margin-right: .278em;
+}
+
+mjx-container [rspace="5"] {
+  margin-right: .333em;
+}
+
+mjx-container [size="s"] {
+  font-size: 70.7%;
+}
+
+mjx-container [size="ss"] {
+  font-size: 50%;
+}
+
+mjx-container [size="Tn"] {
+  font-size: 60%;
+}
+
+mjx-container [size="sm"] {
+  font-size: 85%;
+}
+
+mjx-container [size="lg"] {
+  font-size: 120%;
+}
+
+mjx-container [size="Lg"] {
+  font-size: 144%;
+}
+
+mjx-container [size="LG"] {
+  font-size: 173%;
+}
+
+mjx-container [size="hg"] {
+  font-size: 207%;
+}
+
+mjx-container [size="HG"] {
+  font-size: 249%;
+}
+
+mjx-container [width="full"] {
+  width: 100%;
+}
+
+mjx-box {
+  display: inline-block;
+}
+
+mjx-block {
+  display: block;
+}
+
+mjx-itable {
+  display: inline-table;
+}
+
+mjx-row {
+  display: table-row;
+}
+
+mjx-row > * {
+  display: table-cell;
+}
+
+mjx-mtext {
+  display: inline-block;
+}
+
+mjx-mstyle {
+  display: inline-block;
+}
+
+mjx-merror {
+  display: inline-block;
+  color: red;
+  background-color: yellow;
+}
+
+mjx-mphantom {
+  visibility: hidden;
+}
+
+_::-webkit-full-page-media, _:future, :root mjx-container {
+  will-change: opacity;
+}
+
+mjx-assistive-mml {
+  position: absolute !important;
+  top: 0px;
+  left: 0px;
+  clip: rect(1px, 1px, 1px, 1px);
+  padding: 1px 0px 0px 0px !important;
+  border: 0px !important;
+  display: block !important;
+  width: auto !important;
+  overflow: hidden !important;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+mjx-assistive-mml[display="block"] {
+  width: 100% !important;
+}
+
+mjx-c::before {
+  display: block;
+  width: 0;
+}
+
+.MJX-TEX {
+  font-family: MJXZERO, MJXTEX;
+}
+
+.TEX-B {
+  font-family: MJXZERO, MJXTEX-B;
+}
+
+.TEX-I {
+  font-family: MJXZERO, MJXTEX-I;
+}
+
+.TEX-MI {
+  font-family: MJXZERO, MJXTEX-MI;
+}
+
+.TEX-BI {
+  font-family: MJXZERO, MJXTEX-BI;
+}
+
+.TEX-S1 {
+  font-family: MJXZERO, MJXTEX-S1;
+}
+
+.TEX-S2 {
+  font-family: MJXZERO, MJXTEX-S2;
+}
+
+.TEX-S3 {
+  font-family: MJXZERO, MJXTEX-S3;
+}
+
+.TEX-S4 {
+  font-family: MJXZERO, MJXTEX-S4;
+}
+
+.TEX-A {
+  font-family: MJXZERO, MJXTEX-A;
+}
+
+.TEX-C {
+  font-family: MJXZERO, MJXTEX-C;
+}
+
+.TEX-CB {
+  font-family: MJXZERO, MJXTEX-CB;
+}
+
+.TEX-FR {
+  font-family: MJXZERO, MJXTEX-FR;
+}
+
+.TEX-FRB {
+  font-family: MJXZERO, MJXTEX-FRB;
+}
+
+.TEX-SS {
+  font-family: MJXZERO, MJXTEX-SS;
+}
+
+.TEX-SSB {
+  font-family: MJXZERO, MJXTEX-SSB;
+}
+
+.TEX-SSI {
+  font-family: MJXZERO, MJXTEX-SSI;
+}
+
+.TEX-SC {
+  font-family: MJXZERO, MJXTEX-SC;
+}
+
+.TEX-T {
+  font-family: MJXZERO, MJXTEX-T;
+}
+
+.TEX-V {
+  font-family: MJXZERO, MJXTEX-V;
+}
+
+.TEX-VB {
+  font-family: MJXZERO, MJXTEX-VB;
+}
+
+mjx-stretchy-v mjx-c, mjx-stretchy-h mjx-c {
+  font-family: MJXZERO, MJXTEX-S1, MJXTEX-S4, MJXTEX, MJXTEX-A ! important;
+}
+
+@font-face /* 0 */ {
+  font-family: MJXZERO;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Zero.woff") format("woff");
+}
+
+@font-face /* 1 */ {
+  font-family: MJXTEX;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Main-Regular.woff") format("woff");
+}
+
+@font-face /* 2 */ {
+  font-family: MJXTEX-B;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Main-Bold.woff") format("woff");
+}
+
+@font-face /* 3 */ {
+  font-family: MJXTEX-I;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Math-Italic.woff") format("woff");
+}
+
+@font-face /* 4 */ {
+  font-family: MJXTEX-MI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Main-Italic.woff") format("woff");
+}
+
+@font-face /* 5 */ {
+  font-family: MJXTEX-BI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Math-BoldItalic.woff") format("woff");
+}
+
+@font-face /* 6 */ {
+  font-family: MJXTEX-S1;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size1-Regular.woff") format("woff");
+}
+
+@font-face /* 7 */ {
+  font-family: MJXTEX-S2;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size2-Regular.woff") format("woff");
+}
+
+@font-face /* 8 */ {
+  font-family: MJXTEX-S3;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size3-Regular.woff") format("woff");
+}
+
+@font-face /* 9 */ {
+  font-family: MJXTEX-S4;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size4-Regular.woff") format("woff");
+}
+
+@font-face /* 10 */ {
+  font-family: MJXTEX-A;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_AMS-Regular.woff") format("woff");
+}
+
+@font-face /* 11 */ {
+  font-family: MJXTEX-C;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Calligraphic-Regular.woff") format("woff");
+}
+
+@font-face /* 12 */ {
+  font-family: MJXTEX-CB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Calligraphic-Bold.woff") format("woff");
+}
+
+@font-face /* 13 */ {
+  font-family: MJXTEX-FR;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Fraktur-Regular.woff") format("woff");
+}
+
+@font-face /* 14 */ {
+  font-family: MJXTEX-FRB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Fraktur-Bold.woff") format("woff");
+}
+
+@font-face /* 15 */ {
+  font-family: MJXTEX-SS;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Regular.woff") format("woff");
+}
+
+@font-face /* 16 */ {
+  font-family: MJXTEX-SSB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Bold.woff") format("woff");
+}
+
+@font-face /* 17 */ {
+  font-family: MJXTEX-SSI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Italic.woff") format("woff");
+}
+
+@font-face /* 18 */ {
+  font-family: MJXTEX-SC;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Script-Regular.woff") format("woff");
+}
+
+@font-face /* 19 */ {
+  font-family: MJXTEX-T;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Typewriter-Regular.woff") format("woff");
+}
+
+@font-face /* 20 */ {
+  font-family: MJXTEX-V;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Vector-Regular.woff") format("woff");
+}
+
+@font-face /* 21 */ {
+  font-family: MJXTEX-VB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Vector-Bold.woff") format("woff");
+}
+</style><link crossorigin="anonymous" href="https://distill.pub/third-party/katex/katex.min.css" rel="stylesheet"/><script async="" src="https://distill.pub/third-party/katex/katex.min.js"></script></head>
+<body> <d-front-matter> <script async="" type="text/json">
+      {
+            "title": "在 JAX 中为 TPU 编程",
+            "description": "如何使用 JAX 高效地为 TPU 编程！本节大部分内容摘自<a href='https://jax.readthedocs.io/en/latest/jep/14273-shard-map.html'>此处</a>。您可以在 <a href='https://colab.sandbox.google.com/'>Google Colab</a> 上使用免费的 TPU 运行本节中的代码示例。",
+            "published": "February 04, 2025",
+            "authors": [
+              
+              {
+                "author": "Jacob Austin",
+                "authorURL": "https://www.jacobaustin.org/",
+                "affiliations": [
+                  {
+                    "name": "Google DeepMind",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Sholto Douglas",
+                "authorURL": "https://x.com/_sholtodouglas",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Roy Frostig",
+                "authorURL": "https://cs.stanford.edu/~rfrostig/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Anselm Levskaya",
+                "authorURL": "https://anselmlevskaya.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Charlie Chen",
+                "authorURL": "https://x.com/charliexychen",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Sharad Vikram",
+                "authorURL": "https://sharadvikram.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Federico Lebron",
+                "authorURL": "https://fedelebron.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Peter Choy",
+                "authorURL": "https://x.com/pchoy95",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Vinay Ramasesh",
+                "authorURL": "https://x.com/vinayramasesh",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Albert Webson",
+                "authorURL": "https://representation.ai/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Yash Katariya",
+                "authorURL": "https://x.com/yashk2810",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Reiner Pope<sup>*</sup>",
+                "authorURL": "https://x.com/reinerpope",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              }
+              
+            ],
+            "katex": {
+              "delimiters": [
+                {
+                  "left": "$",
+                  "right": "$",
+                  "display": false
+                },
+                {
+                  "left": "$$",
+                  "right": "$$",
+                  "display": true
+                }
+              ]
+            }
+          }
+    </script> </d-front-matter> <header> <script>
+    function goToTop() {
+      document.body.scrollTop = 0; // For Safari
+      document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+    }
+
+    // When the user scrolls down 20px from the top of the document, show the button
+    window.onscroll = function() {scrollFunction()};
+
+    function scrollFunction() {
+      // Get the button:
+      let mybutton = document.getElementById("top-button");
+
+      if (document.body.scrollTop > 40 || document.documentElement.scrollTop > 40) {
+        mybutton.style.display = "block";
+      } else {
+        mybutton.style.display = "none";
+      }
+  }
+  </script> <nav class="navbar navbar-light navbar-expand-sm fixed-top" id="navbar" role="navigation"> <div class="container"> <a class="navbar-brand title font-weight-lighter" href="scaling-book.html"> 如何扩展你的模型 </a> <button aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler collapsed ml-auto" data-target="#navbarNav" data-toggle="collapse" type="button"> <span class="sr-only">切换导航</span> <span class="icon-bar top-bar"></span> <span class="icon-bar middle-bar"></span> <span class="icon-bar bottom-bar"></span> </button> <div class="left-button section-button"><a href="profiling.html"><svg viewbox="-78.5 0 512 512"><path d="M257 64L291 98 128 262 291 426 257 460 61 262 257 64Z"></path></svg></a></div> <div class="right-button section-button"><a href="conclusion.html"><svg viewbox="-78.5 0 512 512"><path d="M98 460L64 426 227 262 64 98 98 64 294 262 98 460Z"></path></svg></a></div> <div class="collapse navbar-collapse text-right" id="navbarNav"> <ul class="navbar-nav ml-auto flex-nowrap"> <li class="nav-item"> <a class="nav-link" href="scaling-book.html"> </a> </li> <li class="nav-item nav-hidden"><a class="nav-link" id="top-button" onclick="goToTop()" style="display: none;">返回顶部</a></li> <li class="nav-item nav-hidden"><p class="nav-link"></p></li> <li class="nav-item nav-hidden"><a class="nav-link" href="profiling.html">上一部分</a></li> <li class="nav-item nav-hidden"><a class="nav-link" href="conclusion.html">下一部分</a></li> <li class="nav-item nav-hidden"><p class="nav-link"></p></li> <li class="nav-item dropdown"> <a aria-expanded="false" aria-haspopup="true" class="nav-link dropdown-toggle" data-toggle="dropdown" href="#" id="navbarDropdown" role="button">章节 </a> <div aria-labelledby="navbarDropdown" class="dropdown-menu dropdown-menu-right"> <a class="dropdown-item" href="https://jax-ml.github.io/scaling-book/index">第0部分. 引言</a> <a class="dropdown-item" href="roofline.html">第1部分. 屋顶线模型简介</a> <a class="dropdown-item" href="tpus.html">第2部分. TPU 全方位解析</a> <a class="dropdown-item" href="sharding.html">第3部分. 分片矩阵乘法</a> <a class="dropdown-item" href="transformers.html">第4部分. Transformer</a> <a class="dropdown-item" href="training.html">第5部分. 训练</a> <a class="dropdown-item" href="applied-training.html">第6部分. 训练 LLaMA</a> <a class="dropdown-item" href="inference.html">第7部分. 推理</a> <a class="dropdown-item" href="applied-inference.html">第8部分. 部署 LLaMA</a> <a class="dropdown-item" href="profiling.html">第9部分. 性能分析</a> <a class="dropdown-item" href="jax-stuff.html">第10部分. JAX 全方位解析</a> <a class="dropdown-item" href="conclusion.html">第11部分. 结论</a> <a class="dropdown-item" href="gpus.html">第12部分. GPU</a> </div> </li> <li class="toggle-container"> <button id="light-toggle" title="Change theme"> <i class="ti ti-sun-moon" id="light-toggle-system"></i> <i class="ti ti-moon-filled" id="light-toggle-dark"></i> <i class="ti ti-sun-filled" id="light-toggle-light"></i> </button> </li> </ul> </div> </div> </nav> <progress id="progress" value="0"> <div class="progress-container"> <span class="progress-bar"></span> </div> </progress> </header> <div class="post distill"><div class="translation-info base-grid" style="margin-bottom: 20px;">
+<div style="grid-column: text;
+                       display: flex;
+                       align-items: center;
+                       justify-content: space-between;
+                       padding: 16px 0;
+                       border-bottom: 1px solid var(--global-text-color-light, rgba(0,0,0,0.15));
+                       font-size: 16px;
+                       line-height: 1.5;
+                       color: var(--global-text-color, currentColor);">
+<div style="display: flex;
+                           flex-direction: column;
+                           gap: 8px;">
+<div>
+<span style="font-weight: 600; color: var(--global-text-color, currentColor);">🔗 英文原文：</span>
+<a href="https://jax-ml.github.io/scaling-book/jax-stuff/" onmouseout="this.style.textDecoration='none'" onmouseover="this.style.textDecoration='underline'" rel="noopener noreferrer" style="color: var(--global-theme-color, #004276);
+                                  text-decoration: none;
+                                  margin-left: 4px;" target="_blank">
+                           https://jax-ml.github.io/scaling-book/jax-stuff/
+                        </a>
+</div>
+<div>
+<span style="font-weight: 600; color: var(--global-text-color, currentColor);">✍️ 翻译：</span>
+<span style="margin-left: 4px; color: var(--global-text-color, currentColor);">北极的树</span>
+</div>
+</div>
+<div style="flex-shrink: 0;
+                           display: flex;
+                           flex-direction: column;
+                           align-items: center;
+                           gap: 6px;
+                           margin-left: 20px;">
+<img alt="微信二维码" loading="lazy" src="https://wechat-account-1251781786.cos.ap-guangzhou.myqcloud.com/wechat_account.jpeg" style="width: 80px;
+                                height: 80px;
+                                border-radius: 6px;
+                                opacity: 0.9;"/>
+<span style="font-size: 12px;
+                                 color: var(--global-text-color-light, currentColor);
+                                 opacity: 0.8;
+                                 text-align: center;">
+                        微信公众号
+                    </span>
+</div>
+</div>
+</div> <d-title> <h1>在 JAX 中为 TPU 编程</h1> <p>《<a href="scaling-book.html">如何扩展你的模型</a>》第10部分 (<a href="profiling.html">第9部分：性能分析</a> | <a href="conclusion.html">第11部分：结论</a>)</p> <p>如何使用 JAX 高效地为 TPU 编程！本节大部分内容摘自<a href="https://jax.readthedocs.io/en/latest/jep/14273-shard-map.html" rel="external nofollow noopener" target="_blank">此处</a>。您可以在 <a href="https://colab.sandbox.google.com/" rel="external nofollow noopener" target="_blank">Google Colab</a> 上使用免费的 TPU 运行本节中的代码示例。</p> </d-title> <d-byline>
+<div class="byline grid">
+<div class="authors-affiliations grid">
+<h3 style="grid-column: 1; grid-row: 1;">作者</h3>
+<h3></h3>
+<h3>单位</h3>
+<p class="author" style="grid-column: 1; grid-row: 2;">
+<a class="name" href="https://www.jacobaustin.org/">Jacob Austin</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 2;">
+<span class="affiliation">Google DeepMind</span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 3;">
+<a class="name" href="https://x.com/_sholtodouglas">Sholto Douglas</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 3;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 4;">
+<a class="name" href="https://cs.stanford.edu/~rfrostig/">Roy Frostig</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 4;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 5;">
+<a class="name" href="https://anselmlevskaya.com/">Anselm Levskaya</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 5;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 6;">
+<a class="name" href="https://x.com/charliexychen">Charlie Chen</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 6;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 7;">
+<a class="name" href="https://sharadvikram.com/">Sharad Vikram</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 7;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 2;">
+<a class="name" href="https://fedelebron.com/">Federico Lebron</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 2;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 3;">
+<a class="name" href="https://x.com/pchoy95">Peter Choy</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 3;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 4;">
+<a class="name" href="https://x.com/vinayramasesh">Vinay Ramasesh</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 4;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 5;">
+<a class="name" href="https://representation.ai/">Albert Webson</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 5;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 6;">
+<a class="name" href="https://x.com/yashk2810">Yash Katariya</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 6;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 7;">
+<a class="name" href="https://x.com/reinerpope">Reiner Pope<sup>*</sup></a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 7;">
+<span class="affiliation"></span>
+</p>
+</div>
+<div>
+<h3>发布日期</h3>
+<p>2025年2月4日</p>
+</div>
+</div>
+</d-byline> <d-article> <d-contents> <nav class="l-text figcaption"> <h3>目录</h3> <div> <a href="#how-does-parallelism-work-in-jax">JAX 中的并行性是如何工作的？</a> </div> <div> <a href="#"></a> </div> <ul> <li> <a href="#auto-sharding-mode">自动分片模式</a> </li> <li> <a href="#explicit-sharding-mode">“显式分片模式”</a> </li> <li> <a href="#manual-sharding-mode-via-shard-map">通过 shard_map 实现的手动分片模式</a> </li> </ul> <div> <a href="#worked-problems">实践问题</a> </div> </nav> </d-contents> <h2 id="how-does-parallelism-work-in-jax">JAX 中的并行性是如何工作的？</h2> <p>JAX 支持三种多设备编程的思想流派：</p> <ol> <li> <strong>编译器，你来掌舵！</strong> 让 XLA 编译器自动对数组进行分区，并决定添加何种通信来支持给定的程序。这使你能够将一个在单设备上运行的程序，无需任何修改，就能自动地在数千个设备上运行。</li> <li> <strong>JAX，你来掌舵！</strong> 自动并行性很棒，但有时编译器会做出一些疯狂的举动。显式分片允许你像往常一样编写单设备代码，但由 JAX 来处理分片传播（而不是编译器）。这意味着当 JAX 不清楚你的意图时，它可以请求你进行澄清。</li> <li> <strong>该死，就让我写我想写的！</strong> 虽然编译器很好用，但它们有时会做错事，添加一些你并不打算使用的通信。有时我们希望明确指定要运行的确切通信。</li> </ol> <table class="table-hover" data-toggle="table"> <thead> <tr> <th style="text-align: center">模式</th> <th style="text-align: center">视图？</th> <th style="text-align: center">显式分片？</th> <th style="text-align: center">显式集合操作？</th> </tr> </thead> <tbody> <tr> <td style="text-align: center">自动</td> <td style="text-align: center">全局</td> <td style="text-align: center">❌</td> <td style="text-align: center">❌</td> </tr> <tr> <td style="text-align: center">显式</td> <td style="text-align: center">全局</td> <td style="text-align: center">✅</td> <td style="text-align: center">❌</td> </tr> <tr> <td style="text-align: center">手动</td> <td style="text-align: center">每设备</td> <td style="text-align: center">✅</td> <td style="text-align: center">✅</td> </tr> </tbody> </table> <p>相应地，JAX 为每种模式都提供了 API：</p> <ol> <li> <code class="language-plaintext highlighter-rouge">jax.jit</code> (使用 <code class="language-plaintext highlighter-rouge">Auto</code> 网格轴) 允许你使用任何现有的 JAX 函数，并用分片的输入来调用它。然后，JAX 会使用 XLA 的 <a href="https://openxla.org/shardy" rel="external nofollow noopener" target="_blank">Shardy</a> 编译器来自动并行化程序。当需要支持现有操作时，XLA 会为你添加通信操作（AllGathers、ReduceScatters、AllReduces 等）。虽然它并不完美，但通常能在无需修改代码的情况下，很好地将你的程序自动扩展到任意数量的芯片上。</li> <li> <code class="language-plaintext highlighter-rouge">jax.jit</code> 使用 <code class="language-plaintext highlighter-rouge">Explicit</code> 网格轴看起来与（1）类似，但它让 JAX 而不是 XLA 来处理分片传播。这意味着数组的分片实际上是 JAX 类型系统的一部分，当 JAX 检测到模糊的通信时会报错，并让用户来解决。</li> <li> <code class="language-plaintext highlighter-rouge">jax.shard_map</code> 是更手动的对应方案。你获得的是程序的设备本地视图，并且必须显式地编写任何你想要的通信。有一个分片数组，并希望每个设备上都有完整的数据？添加一个 <code class="language-plaintext highlighter-rouge">jax.lax.all_gather</code>。想在所有设备上对一个数组求和？添加一个 <code class="language-plaintext highlighter-rouge">jax.lax.psum</code> (一个 AllReduce)。编程更难，但做错事的可能性要小得多。</li> </ol> <h3 id="auto-sharding-mode">自动分片模式</h3> <p>jax.jit 在 JAX 内部扮演两个角色。顾名思义，它会“即时”将一个函数从 Python 编译成字节码（通过 XLA/HLO/LLO），使其运行得更快。但如果输入是分片的，或者用户指定了 <code class="language-plaintext highlighter-rouge">in_sharding</code> 或 <code class="language-plaintext highlighter-rouge">out_sharding</code>，它还会让 XLA 将计算分布到多个设备上，并根据需要添加通信。例如，以下是如何使用 jax.jit 编写一个分片矩阵乘法：</p> <div class="language-py highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code><span class="kn">import</span> <span class="n">jax</span>
+<span class="kn">import</span> <span class="n">jax.numpy</span> <span class="k">as</span> <span class="n">jnp</span>
+
+<span class="c1"># 在一个 TPU v5e 4x2 上运行。这为硬件的两个物理轴分配了名称。
+</span><span class="n">mesh</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="nf">make_mesh</span><span class="p">(</span><span class="n">axis_shapes</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">axis_names</span><span class="o">=</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">))</span>
+
+<span class="c1"># 这告诉 JAX 对所有操作都使用这个网格，所以你只需指定 PartitionSpec P 即可。
+</span><span class="n">jax</span><span class="p">.</span><span class="nf">set_mesh</span><span class="p">(</span><span class="n">mesh</span><span class="p">)</span>
+
+<span class="c1"># 我们创建一个矩阵 W 和输入激活 In，它们被分片到我们的设备上。
+</span><span class="n">In</span> <span class="o">=</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">zeros</span><span class="p">((</span><span class="mi">8</span><span class="p">,</span> <span class="mi">2048</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="p">.</span><span class="n">bfloat16</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">jax</span><span class="p">.</span><span class="nc">NamedSharding</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">jax</span><span class="p">.</span><span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">)))</span>
+<span class="n">W</span> <span class="o">=</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">zeros</span><span class="p">((</span><span class="mi">2048</span><span class="p">,</span> <span class="mi">8192</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="p">.</span><span class="n">bfloat16</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">jax</span><span class="p">.</span><span class="nc">NamedSharding</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">jax</span><span class="p">.</span><span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">,</span> <span class="bp">None</span><span class="p">)))</span>
+
+<span class="k">def</span> <span class="nf">matmul_square</span><span class="p">(</span><span class="n">In</span><span class="p">,</span> <span class="n">W</span><span class="p">):</span>
+  <span class="k">return</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">einsum</span><span class="p">(</span><span class="sh">'</span><span class="s">bd,df-&gt;bf</span><span class="sh">'</span><span class="p">,</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">square</span><span class="p">(</span><span class="n">In</span><span class="p">),</span> <span class="n">W</span><span class="p">)</span>
+
+<span class="c1"># 我们可以在这里显式编译分片的矩阵乘法函数。这会添加所有
+# 必要的通信（例如，在矩阵乘法之后进行 AllReduce）。
+</span><span class="n">jit_matmul</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="nf">jit</span><span class="p">(</span><span class="n">matmul_square</span><span class="p">,</span> <span class="n">out_shardings</span><span class="o">=</span><span class="n">jax</span><span class="p">.</span><span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span> <span class="bp">None</span><span class="p">)).</span><span class="nf">lower</span><span class="p">(</span><span class="n">In</span><span class="p">,</span> <span class="n">W</span><span class="p">).</span><span class="nf">compile</span><span class="p">()</span>
+
+<span class="n">out</span> <span class="o">=</span> <span class="nf">jit_matmul</span><span class="p">(</span><span class="n">In</span><span class="p">,</span> <span class="n">W</span><span class="p">)</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> <p>这将在任何分片策略下自动运行，并将计算分区到我们的设备上。<strong>但是在硬件层面到底发生了什么呢？</strong></p> <ol> <li>首先，我们在设备上创建分片的 In 和 W<d-footnote id="d-footnote-1">注意我们是如何做到这一点的。这是一种创建具有特定分片数组的方法（即通过向创建函数添加 device 参数）。另一种方法是使用 `jnp.array(....)` 正常创建一个数组，然后执行例如 `jax.device_put(..., P('x', 'y'))`。还有一种方法是编写一个函数来创建你想要的数组，然后使用你想要的 `out_shardings` 对其进行 jit 编译。</d-footnote>。W 沿着收缩维度进行 2 路分片，而 In 则进行 4 路分片（同时沿着收缩维度和输出维度）。这对应于 W[D<sub>X</sub>, F] 和 In[B<sub>X</sub>, D<sub>Y</sub>] 的分片，也就是一种模型和数据并行性。</li> <li>如果我们在本地（即单个设备上）运行，<code class="language-plaintext highlighter-rouge">matmul_square</code> 会简单地对输入进行平方运算并执行一个简单的矩阵乘法。但因为我们将 <code class="language-plaintext highlighter-rouge">out_shardings</code> 指定为 <code class="language-plaintext highlighter-rouge">P('X', None)</code>，输出将沿着批次维度分片，但在模型维度上是复制的，并且需要一个 AllReduce 来计算。</li> </ol> <p>使用我们前面章节的表示法，这可能会执行类似以下的操作</p> <ol> <li>Out[B<sub>X</sub>, F] { U<sub>Y</sub> } = In[B<sub>X</sub>, D<sub>Y</sub>] *<sub>D</sub> W[D<sub>Y</sub>, F]</li> <li>Out[B<sub>X</sub>, F] = <strong>AllReduce</strong>(Out[B<sub>X</sub>, F] { U<sub>Y</sub> })</li> </ol> <p><code class="language-plaintext highlighter-rouge">jax.jit</code> 会自动为我们添加这个！我们实际上可以用 <code class="language-plaintext highlighter-rouge">jit_matmul.as_text()</code> 打印出 HLO，并看到以下 HLO（经过大幅缩写）：</p> <div class="language-py highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code><span class="c1"># 这个融合操作是分片输入和矩阵的实际矩阵乘法
+</span><span class="o">%</span><span class="n">fusion</span> <span class="o">=</span> <span class="n">bf16</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">8192</span><span class="p">]{</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">:</span><span class="nc">T</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">128</span><span class="p">)(</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span><span class="nc">S</span><span class="p">(</span><span class="mi">1</span><span class="p">)}</span> <span class="nf">fusion</span><span class="p">(</span><span class="n">bf16</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">1024</span><span class="p">]{</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">:</span><span class="nc">T</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">128</span><span class="p">)(</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">)}</span> <span class="o">%</span><span class="n">param</span><span class="p">,</span> <span class="n">bf16</span><span class="p">[</span><span class="mi">8192</span><span class="p">,</span><span class="mi">1024</span><span class="p">]{</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">:</span><span class="nc">T</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">128</span><span class="p">)(</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span><span class="nc">S</span><span class="p">(</span><span class="mi">1</span><span class="p">)}</span> <span class="o">%</span><span class="n">copy</span><span class="o">-</span><span class="n">done</span><span class="p">)</span>
+
+<span class="c1"># 我们在设备间对部分求和的结果进行归约
+</span><span class="n">ROOT</span> <span class="o">%</span><span class="n">AllReduce</span> <span class="o">=</span> <span class="n">bf16</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">8192</span><span class="p">]{</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">:</span><span class="nc">T</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">128</span><span class="p">)(</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">)}</span> <span class="nc">AllReduce</span><span class="p">(</span><span class="n">bf16</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">8192</span><span class="p">]{</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">:</span><span class="nc">T</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">128</span><span class="p">)(</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span><span class="nc">S</span><span class="p">(</span><span class="mi">1</span><span class="p">)}</span> <span class="o">%</span><span class="n">fusion</span><span class="p">)</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> <p>我们可以看到上面的矩阵乘法（融合操作）和 AllReduce。请特别注意形状。<code class="language-plaintext highlighter-rouge">bf16[2, 1024]</code> 是激活的本地视图，因为我们的 <code class="language-plaintext highlighter-rouge">batch_size=8</code> 被分割到 4 个设备上，而我们的 <code class="language-plaintext highlighter-rouge">d_model=2048</code> 同样被分割成 2 路。</p> <p><strong>这简直太神奇了！</strong> 无论我们的程序多么复杂，<a href="https://jax-ml.github.io/scaling-book/jax-stuff/(https:/openxla.org/shardy)">Shardy</a> 和 jit 都会尝试为所有中间激活找到分片方式，并根据需要添加通信。话虽如此，Shardy 也有其缺陷。它可能会犯错。有时你会查看性能剖析，发现出了问题。一个巨大的 AllGather 占用了 80% 的时间，而这本是不必要的。当这种情况发生时，我们可以尝试通过使用 <code class="language-plaintext highlighter-rouge">jax.lax.with_sharding_constraint</code> 显式地注释中间张量来纠正编译器。例如，对于两个矩阵乘法，我可以用以下方式强制中间激活沿着 <code class="language-plaintext highlighter-rouge">y</code> 维度进行分片（但这不一定是个好主意）：</p> <div class="language-py highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code><span class="kn">import</span> <span class="n">jax</span>
+<span class="kn">import</span> <span class="n">jax.numpy</span> <span class="k">as</span> <span class="n">jnp</span>
+
+<span class="n">mesh</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="nf">make_mesh</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">))</span>
+
+<span class="k">def</span> <span class="nf">matmul</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">Win</span><span class="p">,</span> <span class="n">Wout</span><span class="p">):</span>
+  <span class="n">hidden</span> <span class="o">=</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">einsum</span><span class="p">(</span><span class="sh">'</span><span class="s">bd,df-&gt;bf</span><span class="sh">'</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">Win</span><span class="p">)</span>
+  <span class="n">hidden</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="n">lax</span><span class="p">.</span><span class="nf">with_sharding_constraint</span><span class="p">(</span><span class="n">hidden</span><span class="p">,</span> <span class="n">jax</span><span class="p">.</span><span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">x</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">y</span><span class="sh">'</span><span class="p">))</span>
+  <span class="k">return</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">einsum</span><span class="p">(</span><span class="sh">'</span><span class="s">bf,df-&gt;bd</span><span class="sh">'</span><span class="p">,</span> <span class="n">hidden</span><span class="p">,</span> <span class="n">Wout</span><span class="p">)</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> <p>在自动分区世界里，通过 <code class="language-plaintext highlighter-rouge">jax.lax.with_sharding_constraint</code> 控制中间分片构成了大约 60% 的 JAX 并行编程。但“挑逗编译器”是出了名的不好玩的编程模型。你可能注释了每个中间变量，但仍然不知道是否会得到正确的结果。那么，如果 JAX 本身能够处理和控制分片传播呢？</p> <h3 id="explicit-sharding-mode">显式分片模式</h3> <p>显式分片（或“类型中的分片”）看起来很像自动分片，但分片传播发生在 JAX 层面！每个 JAX 操作都有一个分片规则，它接收操作参数的分片方式，并为操作结果生成一个分片方式。你可以使用 <code class="language-plaintext highlighter-rouge">jax.typeof</code> 查看结果的分片：</p> <div class="language-py highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code><span class="kn">import</span> <span class="n">jax</span>
+<span class="kn">import</span> <span class="n">jax.numpy</span> <span class="k">as</span> <span class="n">jnp</span>
+<span class="kn">import</span> <span class="n">jax.sharding</span> <span class="k">as</span> <span class="n">shd</span>
+
+<span class="c1"># 在一个 TPU v5e 2x2 上运行。这为硬件的两个物理轴分配了名称。
+</span><span class="n">mesh</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="nf">make_mesh</span><span class="p">(</span><span class="n">axis_shapes</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">axis_names</span><span class="o">=</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">),</span>
+                                       <span class="n">axis_types</span><span class="o">=</span><span class="p">(</span><span class="n">shd</span><span class="p">.</span><span class="n">AxisType</span><span class="p">.</span><span class="n">Explicit</span><span class="p">,</span> <span class="n">shd</span><span class="p">.</span><span class="n">AxisType</span><span class="p">.</span><span class="n">Explicit</span><span class="p">))</span>
+
+<span class="c1"># 这告诉 JAX 对所有操作都使用这个网格，所以你只需指定 PartitionSpec P 即可。
+</span><span class="n">jax</span><span class="p">.</span><span class="nf">set_mesh</span><span class="p">(</span><span class="n">mesh</span><span class="p">)</span>
+
+<span class="n">x</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="nf">device_put</span><span class="p">(</span><span class="n">np</span><span class="p">.</span><span class="nf">arange</span><span class="p">(</span><span class="mi">16</span><span class="p">).</span><span class="nf">reshape</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">))</span>
+
+<span class="nd">@jax.jit</span>
+<span class="k">def</span> <span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+  <span class="nf">print</span><span class="p">(</span><span class="n">jax</span><span class="p">.</span><span class="nf">typeof</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>  <span class="c1"># bfloat16[8@X,2@Y]
+</span>  <span class="n">out</span> <span class="o">=</span> <span class="n">x</span> <span class="o">*</span> <span class="mi">2</span>
+  <span class="nf">print</span><span class="p">(</span><span class="n">jax</span><span class="p">.</span><span class="nf">typeof</span><span class="p">(</span><span class="n">out</span><span class="p">))</span>  <span class="c1"># bfloat16[8@X,2@Y]
+</span>  <span class="k">return</span> <span class="n">out</span>
+
+<span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> <p>如你所见，JAX 将分片从输入 (<code class="language-plaintext highlighter-rouge">x</code>) 传播到了输出 (<code class="language-plaintext highlighter-rouge">x</code>)，这可以在追踪时通过 <code class="language-plaintext highlighter-rouge">jax.typeof</code> 进行检查。对于大多数操作，这些规则简单明了，因为只有一个合理的选择（例如，逐元素操作保持相同的分片）。但对于某些操作，如何对结果进行分片是模糊的，在这种情况下，JAX 会抛出一个追踪时错误，并要求程序员显式地提供一个 <code class="language-plaintext highlighter-rouge">out_sharding</code> 参数（例如 jnp.einsum、jnp.reshape 等）。让我们看另一个有冲突的例子：</p> <div class="language-py highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code><span class="c1"># 我们创建一个矩阵 W 和输入激活 In，它们被分片到我们的设备上。
+</span><span class="n">In</span> <span class="o">=</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">zeros</span><span class="p">((</span><span class="mi">8</span><span class="p">,</span> <span class="mi">2048</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="p">.</span><span class="n">bfloat16</span><span class="p">,</span> <span class="n">out_sharding</span><span class="o">=</span><span class="n">jax</span><span class="p">.</span><span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">))</span>
+<span class="n">W</span> <span class="o">=</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">zeros</span><span class="p">((</span><span class="mi">2048</span><span class="p">,</span> <span class="mi">8192</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="p">.</span><span class="n">bfloat16</span><span class="p">,</span> <span class="n">out_sharding</span><span class="o">=</span><span class="n">jax</span><span class="p">.</span><span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">,</span> <span class="bp">None</span><span class="p">))</span>
+
+<span class="nd">@jax.jit</span>
+<span class="k">def</span> <span class="nf">matmul_square</span><span class="p">(</span><span class="n">In</span><span class="p">,</span> <span class="n">W</span><span class="p">):</span>
+  <span class="nf">print</span><span class="p">(</span><span class="n">jax</span><span class="p">.</span><span class="nf">typeof</span><span class="p">(</span><span class="n">In</span><span class="p">))</span>  <span class="c1"># bfloat16[8@X, 2048@Y]
+</span>  <span class="nf">print</span><span class="p">(</span><span class="n">jax</span><span class="p">.</span><span class="nf">typeof</span><span class="p">(</span><span class="n">W</span><span class="p">))</span>  <span class="c1"># bfloat16[2048@Y, 8192]
+</span>  <span class="k">return</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">einsum</span><span class="p">(</span><span class="sh">'</span><span class="s">bd,df-&gt;bf</span><span class="sh">'</span><span class="p">,</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">square</span><span class="p">(</span><span class="n">In</span><span class="p">),</span> <span class="n">W</span><span class="p">)</span>
+
+<span class="nf">matmul_square</span><span class="p">(</span><span class="n">In</span><span class="p">,</span> <span class="n">W</span><span class="p">)</span>  <span class="c1"># 这会报错
+</span></code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> <p>这段代码会报错 <code class="language-plaintext highlighter-rouge">Contracting dimensions are sharded and it is ambiguous how the output should be sharded. Please specify the output sharding via the </code>out_sharding<code class="language-plaintext highlighter-rouge"> parameter. Got lhs_contracting_spec=('Y',) and rhs_contracting_spec=('Y',)</code></p> <p>这太棒了，因为 einsum 的输出应该如何分片是模糊的。输出分片可以是：</p> <ul> <li>P(‘X’, ‘Y’) 这将导致一个 reduce-scatter，或者</li> <li>P(‘X’, None) 这将导致一个 all-reduce</li> </ul> <p>与自动模式不同，显式模式在检测到模糊的通信时会报错，并要求用户解决它。所以在这里你可以这样做：</p> <div class="language-py highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code><span class="nd">@jax.jit</span>
+<span class="k">def</span> <span class="nf">matmul_square</span><span class="p">(</span><span class="n">In</span><span class="p">,</span> <span class="n">W</span><span class="p">):</span>
+  <span class="k">return</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">einsum</span><span class="p">(</span><span class="sh">'</span><span class="s">bd,df-&gt;bf</span><span class="sh">'</span><span class="p">,</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">square</span><span class="p">(</span><span class="n">In</span><span class="p">),</span> <span class="n">W</span><span class="p">,</span> <span class="n">out_sharding</span><span class="o">=</span><span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">))</span>
+
+<span class="n">out</span> <span class="o">=</span> <span class="nf">matmul_square</span><span class="p">(</span><span class="n">In</span><span class="p">,</span> <span class="n">W</span><span class="p">)</span>
+<span class="nf">print</span><span class="p">(</span><span class="n">jax</span><span class="p">.</span><span class="nf">typeof</span><span class="p">(</span><span class="n">out</span><span class="p">))</span>  <span class="c1"># bfloat16[8@X,8192@Y]
+</span></code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> <p>自动模式和显式模式可以通过 <code class="language-plaintext highlighter-rouge">jax.sharding.auto_axes</code> 和 <code class="language-plaintext highlighter-rouge">jax.sharding.explicit_axes</code> API 组合使用。想了解更多信息，可以阅读这篇<a href="https://docs.jax.dev/en/latest/notebooks/explicit-sharding.html" rel="external nofollow noopener" target="_blank">很棒的文档</a>。</p> <h3 id="manual-sharding-mode-via-shard_map">shard_map: 对程序的显式并行性控制</h3> <p>如果说 Shardy 是“编译器掌舵”模式，那么 jax <a href="https://jax.readthedocs.io/en/latest/jep/14273-shard-map.html" rel="external nofollow noopener" target="_blank">shard_map</a> 则将一切都交到你手中。你像在 jax.jit 中一样指定输入的分片，但之后你需要显式地编写所有通信。jax.jit 给你留下的是程序的全局跨设备视图，而 <code class="language-plaintext highlighter-rouge">shard_map</code> 给你的是一个本地的每设备视图。</p> <p>这里有一个例子。试着推断一下这个函数是做什么的：<d-footnote id="d-footnote-2">如果你想在 colab 中通过模拟网格来自己尝试，你可以使用以下单元格 `import jax; jax.config.update('jax_num_cpu_devices', 8)`</d-footnote></p> <div class="language-py highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code><span class="kn">import</span> <span class="n">jax</span>
+<span class="kn">import</span> <span class="n">jax.numpy</span> <span class="k">as</span> <span class="n">jnp</span>
+<span class="kn">import</span> <span class="n">jax.sharding</span> <span class="k">as</span> <span class="n">shd</span>
+
+<span class="n">mesh</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="nf">make_mesh</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="p">(</span><span class="sh">'</span><span class="s">x</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">y</span><span class="sh">'</span><span class="p">),</span> <span class="p">(</span><span class="n">shd</span><span class="p">.</span><span class="n">AxisType</span><span class="p">.</span><span class="n">Explicit</span><span class="p">,</span> <span class="n">shd</span><span class="p">.</span><span class="n">AxisType</span><span class="p">.</span><span class="n">Explicit</span><span class="p">))</span>
+<span class="n">jax</span><span class="p">.</span><span class="nf">set_mesh</span><span class="p">(</span><span class="n">mesh</span><span class="p">)</span>
+
+<span class="n">x</span> <span class="o">=</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="p">.</span><span class="n">int32</span><span class="p">,</span> <span class="n">out_sharding</span><span class="o">=</span><span class="nc">P</span><span class="p">((</span><span class="sh">'</span><span class="s">x</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">y</span><span class="sh">'</span><span class="p">)))</span>
+
+<span class="c1"># 这个函数将对数组的 1/8 进行操作。
+</span><span class="nd">@jax.shard_map</span><span class="p">(</span><span class="n">in_specs</span><span class="o">=</span><span class="nc">P</span><span class="p">((</span><span class="sh">'</span><span class="s">x</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">y</span><span class="sh">'</span><span class="p">)),</span> <span class="n">out_specs</span><span class="o">=</span><span class="nc">P</span><span class="p">())</span>
+<span class="k">def</span> <span class="nf">slice_and_average</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+  <span class="k">assert</span> <span class="n">x</span><span class="p">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="mi">512</span> <span class="o">//</span> <span class="mi">8</span><span class="p">,)</span>
+  <span class="k">return</span> <span class="n">jax</span><span class="p">.</span><span class="n">lax</span><span class="p">.</span><span class="nf">pmean</span><span class="p">(</span><span class="n">x</span><span class="p">[:</span><span class="mi">4</span><span class="p">],</span> <span class="n">axis_name</span><span class="o">=</span><span class="p">(</span><span class="sh">'</span><span class="s">x</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">y</span><span class="sh">'</span><span class="p">))</span>
+
+<span class="n">out</span> <span class="o">=</span> <span class="nf">slice_and_average</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">out</span><span class="p">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="mi">4</span><span class="p">,)</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> <p><strong>这是做什么的？</strong> <code class="language-plaintext highlighter-rouge">slice_and_average</code> 在每个 TPU 上运行，处理数组的 1/8，我们从中切片前 4 个元素，并在整个网格上对它们求平均值。这意味着我们实际上在做 <code class="language-plaintext highlighter-rouge">mean(x[:4], x[64:68], x[128:132], …)</code>。这非常酷，因为在 JAX 中用其他方式表达这个操作并不容易。</p> <p><strong>为什么要这样做而不是用 jax.jit？</strong> 如果我们使用 <code class="language-plaintext highlighter-rouge">jax.jit</code>，<code class="language-plaintext highlighter-rouge">slice_and_average</code> 将会看到数组的全局视图（完整的 <code class="language-plaintext highlighter-rouge">[512,]</code> 数组）。我们将不得不切出这个非均匀的切片，然后执行一个平均操作，而 XLA 必须正确地解释它。XLA 可能会添加错误的通信或感到困惑。在这里，我们看到的是本地视图，并且只编写我们需要的通信。</p> <p><strong>示例 [集合矩阵乘法]：</strong> 举一个更现实的例子，假设我们要实现模型并行性，其中激活最初是按模型分片的，即 A[B<sub>X</sub>, D<sub>Y</sub>] * W[D, F<sub>Y</sub>] -&gt; Out[B<sub>X</sub>, F<sub>Y</sub>]。天真地，我们会先对 A 进行 AllGather，然后进行一个本地矩阵乘法：</p> <ol> <li>A[B<sub>X</sub>, D] = <strong>AllGather</strong><sub>Y</sub>(A[B<sub>X</sub>, D<sub>Y</sub>])</li> <li>Out[B<sub>X</sub>, F<sub>Y</sub>] = A[B<sub>X</sub>, D] *<sub>D</sub> W[D, F<sub>Y</sub>]</li> </ol> <p>可惜，这样做不好，因为它不允许我们将通信与计算重叠。如 <a href="https://dl.acm.org/doi/pdf/10.1145/3567955.3567959" rel="external nofollow noopener" target="_blank">Wang et al. 2023</a> 中所述，可以通过“集合矩阵乘法”来实现重叠。算法基本如下：</p> <ul> <li>对于每个 Y 分片，将 A 的本地块与 W 的本地块进行矩阵乘法，产生形状为 <code class="language-plaintext highlighter-rouge">[B / X, F / Y]</code> 的结果。同时，对 A 进行置换，以便在本地获得下一个块，执行矩阵乘法，并将结果相加。</li> </ul> <p>我们可以用 shard_map 相当容易地实现这一点：</p> <div class="language-py highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code><span class="kn">import</span> <span class="n">functools</span>
+
+<span class="kn">import</span> <span class="n">jax</span>
+<span class="kn">import</span> <span class="n">jax.numpy</span> <span class="k">as</span> <span class="n">jnp</span>
+<span class="kn">import</span> <span class="n">jax.sharding</span> <span class="k">as</span> <span class="n">shd</span>
+<span class="kn">import</span> <span class="n">numpy</span> <span class="k">as</span> <span class="n">np</span>
+
+<span class="n">mesh</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="nf">make_mesh</span><span class="p">(</span><span class="n">axis_shapes</span><span class="o">=</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="n">axis_names</span><span class="o">=</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">),</span>
+                                       <span class="n">axis_types</span><span class="o">=</span><span class="p">(</span><span class="n">shd</span><span class="p">.</span><span class="n">AxisType</span><span class="p">.</span><span class="n">Explicit</span><span class="p">,</span> <span class="n">shd</span><span class="p">.</span><span class="n">AxisType</span><span class="p">.</span><span class="n">Explicit</span><span class="p">))</span>
+<span class="n">jax</span><span class="p">.</span><span class="nf">set_mesh</span><span class="p">(</span><span class="n">mesh</span><span class="p">)</span>
+
+<span class="n">B</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">F</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">,</span> <span class="mi">2048</span><span class="p">,</span> <span class="mi">8192</span>
+<span class="n">A</span> <span class="o">=</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">arange</span><span class="p">(</span><span class="n">np</span><span class="p">.</span><span class="nf">prod</span><span class="p">((</span><span class="n">B</span><span class="p">,</span> <span class="n">D</span><span class="p">))).</span><span class="nf">reshape</span><span class="p">((</span><span class="n">B</span><span class="p">,</span> <span class="n">D</span><span class="p">))</span>
+<span class="n">W</span> <span class="o">=</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">arange</span><span class="p">(</span><span class="n">np</span><span class="p">.</span><span class="nf">prod</span><span class="p">((</span><span class="n">D</span><span class="p">,</span> <span class="n">F</span><span class="p">))).</span><span class="nf">reshape</span><span class="p">((</span><span class="n">D</span><span class="p">,</span> <span class="n">F</span><span class="p">))</span>
+
+<span class="n">A</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="nf">device_put</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">jax</span><span class="p">.</span><span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">))</span>
+<span class="n">W</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="nf">device_put</span><span class="p">(</span><span class="n">W</span><span class="p">,</span> <span class="n">jax</span><span class="p">.</span><span class="nc">P</span><span class="p">(</span><span class="bp">None</span><span class="p">,</span> <span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">))</span>
+
+<span class="nd">@functools.partial</span><span class="p">(</span><span class="n">jax</span><span class="p">.</span><span class="n">jit</span><span class="p">,</span> <span class="n">out_shardings</span><span class="o">=</span><span class="n">jax</span><span class="p">.</span><span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">))</span>
+<span class="k">def</span> <span class="nf">matmul</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">):</span>
+  <span class="k">return</span> <span class="n">lhs</span> <span class="o">@</span> <span class="n">rhs</span>
+
+<span class="k">def</span> <span class="nf">collective_matmul_allgather_lhs_contracting</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">):</span>
+  <span class="c1"># lhs 是循环操作数；rhs 是本地操作数
+</span>  <span class="n">axis_size</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="n">lax</span><span class="p">.</span><span class="nf">axis_size</span><span class="p">(</span><span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">)</span>  <span class="c1"># 在这个例子中 axis_size = 4
+</span>  <span class="n">idx</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="n">lax</span><span class="p">.</span><span class="nf">axis_index</span><span class="p">(</span><span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">)</span>
+
+  <span class="n">chunk_size</span> <span class="o">=</span> <span class="n">lhs</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+  <span class="k">assert</span> <span class="n">rhs</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">%</span> <span class="n">chunk_size</span> <span class="o">==</span> <span class="mi">0</span>
+
+  <span class="k">def</span> <span class="nf">f</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">carrys</span><span class="p">):</span>
+    <span class="n">accum</span><span class="p">,</span> <span class="n">lhs</span> <span class="o">=</span> <span class="n">carrys</span>
+    <span class="n">rhs_chunk</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="n">lax</span><span class="p">.</span><span class="nf">dynamic_slice_in_dim</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="p">(</span><span class="n">idx</span> <span class="o">+</span> <span class="n">i</span><span class="p">)</span> <span class="o">%</span> <span class="n">axis_size</span> <span class="o">*</span> <span class="n">chunk_size</span><span class="p">,</span> <span class="n">chunk_size</span><span class="p">)</span>
+    <span class="c1"># 对一个块进行矩阵乘法
+</span>    <span class="n">update</span> <span class="o">=</span> <span class="n">lhs</span> <span class="o">@</span> <span class="n">rhs_chunk</span>
+    <span class="c1"># 向左循环移位
+</span>    <span class="n">lhs</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="n">lax</span><span class="p">.</span><span class="nf">ppermute</span><span class="p">(
+        </span><span class="n">lhs</span><span class="p">,</span>
+        <span class="n">axis_name</span><span class="o">=</span><span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">,</span>
+        <span class="n">perm</span><span class="o">=</span><span class="p">[(</span><span class="n">j</span><span class="p">,</span> <span class="p">(</span><span class="n">j</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="n">axis_size</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nf">range</span><span class="p">(</span><span class="n">axis_size</span><span class="p">)]</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">accum</span> <span class="o">+</span> <span class="n">update</span><span class="p">,</span> <span class="n">lhs</span>
+
+  <span class="n">accum</span> <span class="o">=</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">zeros</span><span class="p">((</span><span class="n">lhs</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">rhs</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">lhs</span><span class="p">.</span><span class="n">dtype</span><span class="p">)</span>
+  <span class="n">accum</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="n">lax</span><span class="p">.</span><span class="nf">pvary</span><span class="p">(</span><span class="n">accum</span><span class="p">,</span> <span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">))</span>
+  <span class="n">accum</span><span class="p">,</span> <span class="n">lhs</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="n">lax</span><span class="p">.</span><span class="nf">fori_loop</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">axis_size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="p">(</span><span class="n">accum</span><span class="p">,</span> <span class="n">lhs</span><span class="p">),</span> <span class="n">unroll</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+
+  <span class="c1"># 在最后一次置换后计算最后一个块，以使 lhs 恢复到我们找到它时的状态
+</span>  <span class="n">i</span> <span class="o">=</span> <span class="n">axis_size</span> <span class="o">-</span> <span class="mi">1</span>
+  <span class="n">rhs_chunk</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="n">lax</span><span class="p">.</span><span class="nf">dynamic_slice_in_dim</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="p">(</span><span class="n">idx</span> <span class="o">+</span> <span class="n">i</span><span class="p">)</span> <span class="o">%</span> <span class="n">axis_size</span> <span class="o">*</span> <span class="n">chunk_size</span><span class="p">,</span> <span class="n">chunk_size</span><span class="p">)</span>
+  <span class="n">update</span> <span class="o">=</span> <span class="n">lhs</span> <span class="o">@</span> <span class="n">rhs_chunk</span>
+  <span class="k">return</span> <span class="n">accum</span> <span class="o">+</span> <span class="n">update</span>
+
+<span class="n">jit_sharded_f</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="nf">jit</span><span class="p">(</span><span class="n">jax</span><span class="p">.</span><span class="nf">shard_map</span><span class="p">(
+  </span><span class="n">collective_matmul_allgather_lhs_contracting</span><span class="p">,</span>
+  <span class="n">in_specs</span><span class="o">=</span><span class="p">(</span><span class="n">jax</span><span class="p">.</span><span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">),</span> <span class="n">jax</span><span class="p">.</span><span class="nc">P</span><span class="p">(</span><span class="bp">None</span><span class="p">,</span> <span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">)),</span> <span class="n">out_specs</span><span class="o">=</span><span class="n">jax</span><span class="p">.</span><span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span> <span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">)))</span>
+
+<span class="n">shmapped_out</span> <span class="o">=</span> <span class="nf">jit_sharded_f</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">W</span><span class="p">)</span>
+<span class="n">expected_out</span> <span class="o">=</span> <span class="nf">matmul</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">W</span><span class="p">)</span>
+
+<span class="n">np</span><span class="p">.</span><span class="n">testing</span><span class="p">.</span><span class="nf">assert_array_equal</span><span class="p">(</span><span class="n">shmapped_out</span><span class="p">,</span> <span class="n">expected_out</span><span class="p">)</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> <p>这非常巧妙！我们可以对此进行基准测试，发现它也快得多！<a href="https://imgur.com/a/e9I6SrM" rel="external nofollow noopener" target="_blank">这里是</a>默认 jit 矩阵乘法的性能剖析，它耗时 311us，并且在开始时有一个大的阻塞式 AllGather：</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/not-overlapped-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/not-overlapped-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/not-overlapped-1400.webp 1400w" type="image/webp"/> <img class="img-fluid" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/not-overlapped.png" width="100%"/> </picture> </figure> <p><a href="https://imgur.com/a/21iy0Sv" rel="external nofollow noopener" target="_blank">这里是</a>上面那个版本的剖析，耗时 244 us。你可以看到剖析中没有 AllGather。全都是有效的工作！我们的 FLOPs 利用率也高得多。</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/overlapped-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/overlapped-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/overlapped-1400.webp 1400w" type="image/webp"/> <img class="img-fluid" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/overlapped.png" width="100%"/> </picture> </figure> <p>还值得注意的是，在收缩维度上没有分片时的矩阵乘法时间是 <a href="https://imgur.com/a/i3gNKfq" rel="external nofollow noopener" target="_blank">224us</a>，所以我们非常接近未分片的基线。这是一个很好的例子，说明了你可能需要进行何种性能工程来提高 TPU 的利用率。要了解更多 <code class="language-plaintext highlighter-rouge">shard_map</code> 示例，<a href="https://jax.readthedocs.io/en/latest/notebooks/shard_map.html#example-1-all-gather-on-one-side" rel="external nofollow noopener" target="_blank">这篇笔记很棒</a>。</p> <p>现在这里有几个有用的实践问题，可以尝试用 <code class="language-plaintext highlighter-rouge">jax.jit</code> 或 <code class="language-plaintext highlighter-rouge">shard_map</code> 来实现！</p> <h2 id="worked-problems">实践问题</h2> <p>这里有一些随机的 JAX 相关问题。我稍后会添加更多。对于所有这些问题，你都需要在 Colab 中有一定数量的 TPU。你可以使用带有 TPUv2-8 的公共 Colab。从现在开始，我们假设你有 N 个可用设备。</p> <p><strong>问题1：</strong>设 <strong>A</strong> 是一个激活数组，形状为 float32[S<sub>X</sub>, D<sub>Y</sub>]，其中 <code class="language-plaintext highlighter-rouge">X * Y = N</code>。请完成以下操作：</p> <ol> <li> <p>在 JAX 中编写一个函数，计算每个 <code class="language-plaintext highlighter-rouge">(X, Y)</code> 分片内的平均值，即返回一个大小为 [X, Y] 的数组，其中 <code class="language-plaintext highlighter-rouge">arr[i, j]</code> 是分片 <code class="language-plaintext highlighter-rouge">(i, j)</code> 上的平均值。分别用 <code class="language-plaintext highlighter-rouge">jax.jit</code> 和 <code class="language-plaintext highlighter-rouge">shard_map</code> 实现。对每个实现进行性能分析，看看它们耗时多久。是否添加了任何通信？<em>提示：不应该有，但有时 XLA 还是会添加。</em></p> </li> <li> <p>在 JAX 中编写一个函数，对于每个分片 X 内部的某个位移，返回 roll(x, shift, axis=0) - x。我还没那么自虐，不会让你用 jax.jit 来做这个，所以只用 <code class="language-plaintext highlighter-rouge">shard_map</code> 实现即可。</p> </li> </ol> <details><summary>点击此处查看答案。</summary> <p>第1部分：这是第1部分的解答。请注意，对于 <code class="language-plaintext highlighter-rouge">jax.jit</code> 的解决方案，我们必须进行相当复杂的重塑操作。</p> <div class="language-py highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code><span class="kn">import</span> <span class="n">numpy</span> <span class="k">as</span> <span class="n">np</span>
+
+<span class="kn">import</span> <span class="n">jax</span>
+<span class="kn">import</span> <span class="n">jax.numpy</span> <span class="k">as</span> <span class="n">jnp</span>
+
+<span class="n">P</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="n">sharding</span><span class="p">.</span><span class="n">PartitionSpec</span>
+
+<span class="n">mesh</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="nf">make_mesh</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span><span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">))</span>
+
+<span class="n">average_shmap</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="nf">shard_map</span><span class="p">(
+    </span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">.</span><span class="nf">mean</span><span class="p">(</span><span class="n">keepdims</span><span class="o">=</span><span class="bp">True</span><span class="p">),</span>
+    <span class="n">mesh</span><span class="o">=</span><span class="n">mesh</span><span class="p">,</span>
+    <span class="n">in_specs</span><span class="o">=</span><span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span><span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">),</span> <span class="n">out_specs</span><span class="o">=</span><span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span><span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">)</span>
+<span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">average</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+  <span class="n">X</span><span class="p">,</span> <span class="n">Y</span> <span class="o">=</span> <span class="n">mesh</span><span class="p">.</span><span class="n">axis_sizes</span>
+  <span class="k">return</span> <span class="n">x</span><span class="p">.</span><span class="nf">reshape</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">x</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">//</span> <span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">x</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">//</span> <span class="n">Y</span><span class="p">).</span><span class="nf">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+
+<span class="n">average_jit</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="nf">jit</span><span class="p">(</span><span class="n">average</span><span class="p">,</span> <span class="n">out_shardings</span><span class="o">=</span><span class="n">jax</span><span class="p">.</span><span class="nc">NamedSharding</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span><span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">)))</span>
+
+<span class="n">x</span> <span class="o">=</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">arange</span><span class="p">(</span><span class="mi">8</span> <span class="o">*</span> <span class="mi">64</span> <span class="o">*</span> <span class="mi">8</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="p">.</span><span class="n">int32</span><span class="p">).</span><span class="nf">reshape</span><span class="p">(</span><span class="mi">8</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="nf">device_put</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">jax</span><span class="p">.</span><span class="nc">NamedSharding</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span><span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">)))</span>
+
+<span class="n">y1</span> <span class="o">=</span> <span class="nf">average_shmap</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="n">y2</span> <span class="o">=</span> <span class="nf">average_jit</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+<span class="n">np</span><span class="p">.</span><span class="n">testing</span><span class="p">.</span><span class="nf">assert_array_equal</span><span class="p">(</span><span class="n">y1</span><span class="p">,</span> <span class="n">y2</span><span class="p">)</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> <p>第2部分：这是第2部分的类似解答。</p> <div class="language-py highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code><span class="kn">import</span> <span class="n">numpy</span> <span class="k">as</span> <span class="n">np</span>
+
+<span class="kn">import</span> <span class="n">jax</span>
+<span class="kn">import</span> <span class="n">jax.numpy</span> <span class="k">as</span> <span class="n">jnp</span>
+
+<span class="kn">import</span> <span class="n">functools</span>
+
+<span class="n">P</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="n">sharding</span><span class="p">.</span><span class="n">PartitionSpec</span>
+
+<span class="n">mesh</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="nf">make_mesh</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span><span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">))</span>
+
+<span class="k">def</span> <span class="nf">shift_shmap</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">shift</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+  <span class="n">shmapped</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="nf">shard_map</span><span class="p">(
+      </span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">roll</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">shift</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span>
+      <span class="n">mesh</span><span class="o">=</span><span class="n">mesh</span><span class="p">,</span>
+      <span class="n">in_specs</span><span class="o">=</span><span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span><span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">),</span> <span class="n">out_specs</span><span class="o">=</span><span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span><span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">)</span>
+  <span class="p">)</span>
+  <span class="k">return</span> <span class="nf">shmapped</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+<span class="nd">@functools.partial</span><span class="p">(</span><span class="n">jax</span><span class="p">.</span><span class="n">jit</span><span class="p">,</span> <span class="n">static_argnames</span><span class="o">=</span><span class="p">[</span><span class="sh">'</span><span class="s">shift</span><span class="sh">'</span><span class="p">],</span> <span class="n">out_shardings</span><span class="o">=</span><span class="n">jax</span><span class="p">.</span><span class="nc">NamedSharding</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span><span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">)))</span>
+<span class="k">def</span> <span class="nf">shift_jit</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">shift</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+  <span class="n">X</span><span class="p">,</span> <span class="n">Y</span> <span class="o">=</span> <span class="n">mesh</span><span class="p">.</span><span class="n">axis_sizes</span>
+  <span class="n">reshaped</span> <span class="o">=</span> <span class="n">x</span><span class="p">.</span><span class="nf">reshape</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">x</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">//</span> <span class="n">X</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+  <span class="k">return</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">roll</span><span class="p">(</span><span class="n">reshaped</span><span class="p">,</span> <span class="n">shift</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">).</span><span class="nf">reshape</span><span class="p">(</span><span class="n">x</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">x</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+<span class="n">x</span> <span class="o">=</span> <span class="n">jnp</span><span class="p">.</span><span class="nf">arange</span><span class="p">(</span><span class="mi">8</span> <span class="o">*</span> <span class="mi">64</span> <span class="o">*</span> <span class="mi">8</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">jnp</span><span class="p">.</span><span class="n">int32</span><span class="p">).</span><span class="nf">reshape</span><span class="p">(</span><span class="mi">8</span> <span class="o">*</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">jax</span><span class="p">.</span><span class="nf">device_put</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">jax</span><span class="p">.</span><span class="nc">NamedSharding</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="nc">P</span><span class="p">(</span><span class="sh">'</span><span class="s">X</span><span class="sh">'</span><span class="p">,</span><span class="sh">'</span><span class="s">Y</span><span class="sh">'</span><span class="p">)))</span>
+
+<span class="n">y1</span> <span class="o">=</span> <span class="nf">shift_shmap</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+<span class="n">y2</span> <span class="o">=</span> <span class="nf">shift_jit</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+
+<span class="n">np</span><span class="p">.</span><span class="n">testing</span><span class="p">.</span><span class="nf">assert_array_equal</span><span class="p">(</span><span class="n">y1</span><span class="p">,</span> <span class="n">y2</span><span class="p">)</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> </details> <p><strong>问题2：</strong>在这里，我们将一起构建一个基本的“专家混合”（MoE）模型。设 <strong>W</strong>: float32[E<sub>X</sub>, D, F<sub>Y</sub>] 是一组 E 个“专家”矩阵。设 <strong>A</strong>: float32[S<sub>X</sub>, D<sub>Y</sub>]（我们的激活）并且设 <strong>B</strong> 是一组“路由分配”，其中 B[i] 是范围 <code class="language-plaintext highlighter-rouge">[0, E)</code> 内的一个整数，告诉我们希望用哪个矩阵来处理该激活。我们想在 JAX 中编写一个函数，返回 <code class="language-plaintext highlighter-rouge">Out[i] = W[B[i]] @ A[i]</code>。</p> <ol> <li> <p>让我们先完全忽略分片。将所有这些张量做得足够小，以便它们能放入一个设备中。编写这个函数的本地实现。<em>确保你不要物化一个形状为 <code class="language-plaintext highlighter-rouge">[S, D, F]</code> 的数组！提示：尝试将令牌排序到一个形状为 <code class="language-plaintext highlighter-rouge">[E, S, D]</code> 的新缓冲区中，并注意掩码（为什么我们需要第二个维度的大小为 S？）。</em></p> </li> <li> <p>如果你只是对上述方法使用 <code class="language-plaintext highlighter-rouge">jax.jit</code>，会发生一些事情。对此进行性能分析，看看它决定进行何种通信。它需要多长时间？</p> </li> <li> <p>你会注意到的一个问题是，上述方法很可能会在本地收集完整的激活集 <strong>A</strong>，即 AllGather<sub>X</sub>([S<sub>X</sub>, D<sub>Y</sub>])。这不仅在通信方面成本高昂，而且如果我们无法在本地容纳完整的激活集，在内存方面也是极其昂贵的。使用 <code class="language-plaintext highlighter-rouge">shard_map</code> 和显式通信来实现上述功能。</p> <ol> <li> <p>作为第一步，最简单的方法可能是使用一个 <code class="language-plaintext highlighter-rouge">jax.lax.all_gather</code> 并像（a）中那样重新排序。</p> </li> <li> <p>作为第二步，尝试避免物化任何大小为 <code class="language-plaintext highlighter-rouge">[E, S, D]</code> 的数组，即尝试在一个 <code class="language-plaintext highlighter-rouge">jax.lax.while_loop</code> 内部使用一个 <code class="language-plaintext highlighter-rouge">jax.lax.all_to_all</code> 以不规则的方式执行计算。这样，你可以避免物化完整的激活并浪费计算在填充上。这比你最初的实现快多少？</p> </li> </ol> </li> <li> <p>大多数 MoE 模型会将输入路由到多个（k 个）专家，然后对结果进行平均。重构上述代码以实现这一点。在这种情况下，设 <strong>B</strong>: int32[S, k] 用于路由到 k 个专家。</p> </li> </ol> <p><strong>问题3：</strong>上面那个集合矩阵乘法的例子实际上与真实的 LLM 非常相关。让我们调整这个例子来完成整个 Transformer 栈。</p> <ol> <li> <p>作为一个练习，让我们从实现一个 AllReduce 集合矩阵乘法开始，即 A[B<sub>X</sub>, D<sub>Y</sub>] *<sub>D</sub> W[D<sub>Y</sub>, F] -&gt; Out[B<sub>X</sub>, F]。注意输出不是复制的。上面讨论了朴素算法，基本上就是一个本地矩阵乘法后跟一个 AllReduce。尝试制作一个通信重叠的“集合”版本的此操作。<em>提示：在输出维度上进行分块，并可以随意使用 <code class="language-plaintext highlighter-rouge">jax.lax.psum</code>（即 AllReduce）。</em> <em>注意：由于 XLA 处理此问题的方式，它实际上可能不会比基线更快。</em></p> </li> <li> <p>上面 AllReduce 集合矩阵乘法的补充是 ReduceScatter 集合矩阵乘法，如 Tmp[B<sub>X</sub>, F<sub>Y</sub>] *<sub>F</sub> W2[F<sub>Y</sub>, D] -&gt; Out[B<sub>X</sub>, D<sub>Y</sub>]。这发生在 Transformer 中的下投影矩阵中。在 JAX 中实现一个集合的、重叠的版本。注意只传递所需的最少量数据。<em>提示：尝试在累加结果时对其进行置换。</em></p> </li> <li> <p>将这两者组合成一个端到端的 Transformer 块，该块执行 In[B<sub>X</sub>, D<sub>Y</sub>] *<sub>D</sub> W<sub>in</sub>[D, F<sub>Y</sub>] *<sub>F</sub> W<sub>out</sub>[F<sub>Y</sub>, D] -&gt; Out[B<sub>X</sub>, D<sub>Y</sub>] 并带有重叠的通信。<d-footnote id="d-footnote-3">和之前一样，由于我们在此省略了一个非线性操作，我们不能先计算 <d-math>W_{in} \cdot W_{out}</d-math>。</d-footnote> 这比 <code class="language-plaintext highlighter-rouge">jax.jit</code> 实现快多少？</p> </li> </ol> <p><strong>问题4：</strong>上面实现的所有集合矩阵乘法都是单向的：它们只在一个方向上进行置换。重写集合 AllReduce 矩阵乘法和集合 ReduceScatter 矩阵乘法，以使用双向通信。它们快了多少？</p> <h3 id="thats-all-for-part-10-thats-basically-it-for-final-conclusions-and-further-reading-click-here">第10部分到此结束。基本上就是这样了！要查看最终结论和进一步阅读，请点击<a href="conclusion.html">此处</a>。</h3> </d-article> <d-appendix>
+<style>
+
+d-appendix {
+  contain: layout style;
+  font-size: 0.8em;
+  line-height: 1.7em;
+  margin-top: 60px;
+  margin-bottom: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  color: rgba(0,0,0,0.5);
+  padding-top: 60px;
+  padding-bottom: 48px;
+}
+
+d-appendix h3 {
+  grid-column: page-start / text-start;
+  font-size: 15px;
+  font-weight: 500;
+  margin-top: 1em;
+  margin-bottom: 0;
+  color: rgba(0,0,0,0.65);
+}
+
+d-appendix h3 + * {
+  margin-top: 1em;
+}
+
+d-appendix ol {
+  padding: 0 0 0 15px;
+}
+
+@media (min-width: 768px) {
+  d-appendix ol {
+    padding: 0 0 0 30px;
+    margin-left: -30px;
+  }
+}
+
+d-appendix li {
+  margin-bottom: 1em;
+}
+
+d-appendix a {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+d-appendix > * {
+  grid-column: text;
+}
+
+d-appendix > d-footnote-list,
+d-appendix > d-citation-list,
+d-appendix > distill-appendix {
+  grid-column: screen;
+}
+
+</style>
+<d-footnote-list style="">
+<style>
+
+d-footnote-list {
+  contain: layout style;
+}
+
+d-footnote-list > * {
+  grid-column: text;
+}
+
+d-footnote-list a.footnote-backlink {
+  color: rgba(0,0,0,0.3);
+  padding-left: 0.5em;
+}
+
+</style>
+<h3>脚注</h3>
+<ol><li id="d-footnote-1-listing">注意我们是如何做到这一点的。这是一种创建具有特定分片数组的方法（即通过向创建函数添加 device 参数）。另一种方法是使用 `jnp.array(....)` 正常创建一个数组，然后执行例如 `jax.device_put(..., P('x', 'y'))`。还有一种方法是编写一个函数来创建你想要的数组，然后使用你想要的 `out_shardings` 对其进行 jit 编译。<a class="footnote-backlink" href="#d-footnote-1">[↩]</a></li><li id="d-footnote-2-listing">如果你想在 colab 中通过模拟网格来自己尝试，你可以使用以下单元格 `import jax; jax.config.update('jax_num_cpu_devices', 8)`<a class="footnote-backlink" href="#d-footnote-2">[↩]</a></li><li id="d-footnote-3-listing">和之前一样，由于我们在此省略了一个非线性操作，我们不能先计算 <d-math>W_{in} \cdot W_{out}</d-math>。<a class="footnote-backlink" href="#d-footnote-3">[↩]</a></li></ol>
+</d-footnote-list> <d-citation-list style="display: none;"></d-citation-list> <div class="base-grid appendix-entry"> <h3 style="grid-column: 0;">杂项</h3> <p class="author-footnote" style="grid-column: text;"><sup>*</sup>工作于 Google DeepMind 完成，现就职于 MatX。</p> </div> <div class="base-grid appendix-entry"> <h3 style="grid-column: 0;">引用</h3> <p class="author-footnote">在学术场合中引用，请按以下格式引用此作品：</p> <div class="author-footnote"> <div class="language-bibtex highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code>    <span class="c">Austin et al., "How to Scale Your Model", Google DeepMind, online, 2025.</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> </div> <p class="author-footnote">或使用 BibTeX 条目：</p> <div class="author-footnote"> <div class="language-bibtex highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code>    <span class="nc">@article</span><span class="p">{</span><span class="nl">scaling-book</span><span class="p">,</span>
+      <span class="na">title</span> <span class="p">=</span> <span class="s">{How to Scale Your Model}</span><span class="p">,</span>
+      <span class="na">author</span> <span class="p">=</span> <span class="s">{Austin, Jacob and Douglas, Sholto and Frostig, Roy and Levskaya, Anselm and Chen, Charlie and Vikram, Sharad
+      and Lebron, Federico and Choy, Peter and Ramasesh, Vinay and Webson, Albert and Pope, Reiner}</span><span class="p">,</span>
+      <span class="na">publisher</span> <span class="p">=</span> <span class="s">{Google DeepMind}</span><span class="p">,</span>
+      <span class="na">howpublished</span> <span class="p">=</span> <span class="s">{Online}</span><span class="p">,</span>
+      <span class="na">note</span> <span class="p">=</span> <span class="s">{Retrieved from https://jax-ml.github.io/scaling-book/}</span><span class="p">,</span>
+      <span class="na">year</span> <span class="p">=</span> <span class="s">{2025}</span>
+    <span class="p">}</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> </div> </div> </d-appendix> <d-bibliography src="/scaling-book/assets/bibliography/"></d-bibliography> <div id="giscus_thread" style="max-width: 930px; margin: 0 auto;"> <script>
+      let giscusTheme = determineComputedTheme();
+      let giscusAttributes = {
+        src: 'https://giscus.app/client.js',
+        'data-repo': 'jax-ml/scaling-book',
+        'data-repo-id': '',
+        'data-category': 'General',
+        'data-category-id': '',
+        'data-mapping': 'title',
+        'data-strict': '0',
+        'data-reactions-enabled': '1',
+        'data-emit-metadata': '0',
+        'data-input-position': 'bottom',
+        'data-theme': giscusTheme,
+        'data-loading': '1',
+        'data-lang': 'en',
+        crossorigin: 'anonymous',
+        async: '',
+      };
+
+      let giscusScript = document.createElement('script');
+      Object.entries(giscusAttributes).forEach(([key, value]) => giscusScript.setAttribute(key, value));
+      document.getElementById('giscus_thread').appendChild(giscusScript);
+    </script><script async="" crossorigin="anonymous" data-category="General" data-category-id="" data-emit-metadata="0" data-input-position="bottom" data-lang="en" data-loading="1" data-mapping="title" data-reactions-enabled="1" data-repo="jax-ml/scaling-book" data-repo-id="" data-strict="0" data-theme="light" src="https://giscus.app/client.js"></script><div class="giscus"><iframe allow="clipboard-write" class="giscus-frame giscus-frame--loading" scrolling="no" src="https://giscus.app/en/widget?origin=https%3A%2F%2Fjax-ml.github.io%2Fscaling-book%2Fjax-stuff%2F&amp;session=&amp;theme=light&amp;reactionsEnabled=1&amp;emitMetadata=0&amp;inputPosition=bottom&amp;repo=jax-ml%2Fscaling-book&amp;repoId=&amp;category=General&amp;categoryId=&amp;strict=0&amp;description=How+to+use+JAX+to+program+TPUs+efficiently%21+Much+of+this+section+is+taken+from+%3Ca+href%3D%27https%3A%2F%2Fjax.readthedocs.io%2Fen%2Flatest%2Fjep%2F14273-shard-map.html%27%3Ehere%3C%2Fa%3E.+You+can+run+the+code+examples+in+this+section+with+free+TPUs+on+%3Ca+href%3D%27https%3A%2F%2Fcolab.sandbox.google.com%2F%27%3EGoogle+Colab%3C%2Fa%3E.&amp;backLink=https%3A%2F%2Fjax-ml.github.io%2Fscaling-book%2Fjax-stuff%2F&amp;term=Programming+TPUs+in+JAX+%7C+How+To+Scale+Your+Model" style="opacity: 0;" title="Comments"></iframe></div> <noscript>请启用 JavaScript 以查看由 giscus 驱动的<a href="http://giscus.app/?ref_noscript" rel="external nofollow noopener" target="_blank">评论</a>。 </noscript> </div> </div> <footer class="sticky-bottom mt-5" role="contentinfo"> <div class="container"> © 版权所有 2025。由 <a href="https://jekyllrb.com/" rel="external nofollow noopener" target="_blank">Jekyll</a> 强力驱动，使用 <a href="https://github.com/alshedivat/al-folio" rel="external nofollow noopener" target="_blank">al-folio</a> 主题。托管于 <a href="https://pages.github.com/" rel="external nofollow noopener" target="_blank">GitHub Pages</a>。 </div> </footer> <script crossorigin="anonymous" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/bootstrap.bundle.min.js"></script> <script crossorigin="anonymous" integrity="sha256-NdbiivsvWt7VYCt6hYNT3h/th9vSTL4EDWeGs5SN3DA=" src="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/js/mdb.min.js"></script> <script crossorigin="anonymous" defer="" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" src="https://cdn.jsdelivr.net/npm/medium-zoom@1.1.0/dist/medium-zoom.min.js"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/zoom.js?85ddb88934d28b74e78031fd54cf8308"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/no_defer.js?2781658a0a2b13ed609542042a859126"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/common.js?e0514a05c5c95ac1a93a8dfd5249b92e"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/copy_code.js?12775fdf7f95e901d7119054556e495f" type="text/javascript"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/jupyter_new_tab.js?d9f17b6adc2311cbabd747f4538bb15f"></script> <script crossorigin="anonymous" defer="" id="MathJax-script" integrity="sha256-MASABpB4tYktI2Oitl4t+78w/lyA+D7b/s9GEP0JOGI=" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" type="text/javascript"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/mathjax-setup.js?70d799092f862ad98c7876aa47712e20"></script> <script crossorigin="anonymous" defer="" src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/progress-bar.js?2f30e0e6801ea8f5036fa66e1ab0a71a" type="text/javascript"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/vanilla-back-to-top.min.js?f40d453793ff4f64e238e420181a1d17"></script> <script>
+    addBackToTop();
+  </script><div class="hidden" id="back-to-top"><svg viewbox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg></div> <div class="hiddendiv common"></div></body>
+</html>

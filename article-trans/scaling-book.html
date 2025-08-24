@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+
+<html class="transition" data-theme="light" data-theme-setting="system" lang="zh-CN">
+<head><link href="https://giscus.app/default.css" id="giscus-css" rel="stylesheet"/><style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:20px;margin:11px auto 0;width:20px}#back-to-top.hidden{bottom:-56px;opacity:0}</style> <meta content="text/html; charset=utf-8" http-equiv="Content-Type"/> <meta charset="utf-8"/> <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport"/> <meta content="IE=edge" http-equiv="X-UA-Compatible"/> <title>如何扩展您的模型</title> <meta content=" " name="author"/> <meta content="训练大型语言模型（LLM）的过程常被比作炼金术，但理解并优化模型性能并非难事。本书旨在揭开语言模型扩展科学的神秘面纱：深入解析 TPU (和 GPU) 的工作原理及其通信方式，阐述 LLM 如何在真实硬件上运行，并探讨如何在训练和推理过程中实现模型并行化，从而在巨大规模下实现高效运行。如果您曾思考过“训练一个 LLM 的成本有多高？”， “自己部署模型需要多少内存？”，或者“什么是 AllGather？”，那么我们希望这本书能对您有所帮助。" name="description"/> <meta content="scaling, jax, llms, transformers, tpus, google, deepmind, parallelism, pallas" name="keywords"/> <link href="https://jax-ml.github.io/scaling-book/assets/css/bootstrap.min.css?a4b3f509e79c54a512b890d73235ef04" rel="stylesheet"/> <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/css/mdb.min.css" integrity="sha256-jpjYvU3G3N6nrrBwXJoVEYI/0zw8htfFnhT9ljN3JJw=" rel="stylesheet"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/academicons.min.css?f0b7046b84e425c55f3463ac249818f5" rel="stylesheet"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/scholar-icons.css?62b2ac103a88034e6882a5be5f3e2772" rel="stylesheet"/> <link defer="" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Roboto+Slab:100,300,400,500,700|Material+Icons&amp;display=swap" rel="stylesheet" type="text/css"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/jekyll-pygments-themes-vs.css?4ee1a2facd1a8a76347f4bd43a740500" id="highlight_theme_light" media="" rel="stylesheet"/> <link href="https://jax-ml.github.io/scaling-book/assets/img/favicon.png?fddbd8c2ec231ba2060e67c85de32a55" rel="shortcut icon"/> <link href="https://jax-ml.github.io/scaling-book/assets/css/main.css?d41d8cd98f00b204e9800998ecf8427e" rel="stylesheet"/> <link href="scaling-book.html" rel="canonical"/> <style id="distill-prerendered-styles" type="text/css">/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+html {
+  font-size: 14px;
+	line-height: 1.6em;
+  /* font-family: "Libre Franklin", "Helvetica Neue", sans-serif; */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
+  /*, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";*/
+  text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media(min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: #004276;
+}
+
+figure {
+  margin: 0;
+}
+
+table {
+	border-collapse: collapse;
+	border-spacing: 0;
+}
+
+table th {
+	text-align: left;
+}
+
+table thead {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+table thead th {
+  padding-bottom: 0.5em;
+}
+
+table tbody :first-child td {
+  padding-top: 0.5em;
+}
+
+pre {
+  overflow: auto;
+  max-width: 100%;
+}
+
+p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+sup, sub {
+  vertical-align: baseline;
+  position: relative;
+  top: -0.4em;
+  line-height: 1em;
+}
+
+sub {
+  top: 0.4em;
+}
+
+.kicker,
+.marker {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+
+/* Headline */
+
+@media(min-width: 1024px) {
+  d-title h1 span {
+    display: block;
+  }
+}
+
+/* Figure */
+
+figure {
+  position: relative;
+  margin-bottom: 2.5em;
+  margin-top: 1.5em;
+}
+
+figcaption+figure {
+
+}
+
+figure img {
+  width: 100%;
+}
+
+figure svg text,
+figure svg tspan {
+}
+
+figcaption,
+.figcaption {
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 12px;
+  line-height: 1.5em;
+}
+
+@media(min-width: 1024px) {
+figcaption,
+.figcaption {
+    font-size: 13px;
+  }
+}
+
+figure.external img {
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.1);
+  padding: 18px;
+  box-sizing: border-box;
+}
+
+figcaption a {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+figcaption b,
+figcaption strong, {
+  font-weight: 600;
+  color: rgba(0, 0, 0, 1.0);
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@supports not (display: grid) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    display: block;
+    padding: 8px;
+  }
+}
+
+.base-grid,
+distill-header,
+d-title,
+d-abstract,
+d-article,
+d-appendix,
+distill-appendix,
+d-byline,
+d-footnote-list,
+d-citation-list,
+distill-footer {
+  display: grid;
+  justify-items: stretch;
+  grid-template-columns: [screen-start] 8px [page-start kicker-start text-start gutter-start middle-start] 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr [text-end page-end gutter-end kicker-end middle-end] 8px [screen-end];
+  grid-column-gap: 8px;
+}
+
+.grid {
+  display: grid;
+  grid-column-gap: 8px;
+}
+
+@media(min-width: 768px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start middle-start text-start] 45px 45px 45px 45px 45px 45px 45px 45px [ kicker-end text-end gutter-start] 45px [middle-end] 45px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 16px;
+  }
+
+  .grid {
+    grid-column-gap: 16px;
+  }
+}
+
+@media(min-width: 1000px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start] 50px [middle-start] 50px [text-start kicker-end] 50px 50px 50px 50px 50px 50px 50px 50px [text-end gutter-start] 50px [middle-end] 50px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 16px;
+  }
+
+  .grid {
+    grid-column-gap: 16px;
+  }
+}
+
+@media(min-width: 1180px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start] 60px [middle-start] 60px [text-start kicker-end] 60px 60px 60px 60px 60px 60px 60px 60px [text-end gutter-start] 60px [middle-end] 60px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 32px;
+  }
+
+  .grid {
+    grid-column-gap: 32px;
+  }
+}
+
+
+
+
+.base-grid {
+  grid-column: screen;
+}
+
+/* .l-body,
+d-article > *  {
+  grid-column: text;
+}
+
+.l-page,
+d-title > *,
+d-figure {
+  grid-column: page;
+} */
+
+.l-gutter {
+  grid-column: gutter;
+}
+
+.l-text,
+.l-body {
+  grid-column: text;
+}
+
+.l-page {
+  grid-column: page;
+}
+
+.l-body-outset {
+  grid-column: middle;
+}
+
+.l-page-outset {
+  grid-column: page;
+}
+
+.l-screen {
+  grid-column: screen;
+}
+
+.l-screen-inset {
+  grid-column: screen;
+  padding-left: 16px;
+  padding-left: 16px;
+}
+
+
+/* Aside */
+
+d-article aside {
+  grid-column: gutter;
+  font-size: 12px;
+  line-height: 1.6em;
+  color: rgba(0, 0, 0, 0.6)
+}
+
+@media(min-width: 768px) {
+  aside {
+    grid-column: gutter;
+  }
+
+  .side {
+    grid-column: gutter;
+  }
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-title {
+  padding: 2rem 0 1.5rem;
+  contain: layout style;
+  overflow-x: hidden;
+}
+
+@media(min-width: 768px) {
+  d-title {
+    padding: 4rem 0 1.5rem;
+  }
+}
+
+d-title h1 {
+  grid-column: text;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.1em;
+  margin: 0 0 0.5rem;
+}
+
+@media(min-width: 768px) {
+  d-title h1 {
+    font-size: 50px;
+  }
+}
+
+d-title p {
+  font-weight: 300;
+  font-size: 1.2rem;
+  line-height: 1.55em;
+  grid-column: text;
+}
+
+d-title .status {
+  margin-top: 0px;
+  font-size: 12px;
+  color: #009688;
+  opacity: 0.8;
+  grid-column: kicker;
+}
+
+d-title .status span {
+  line-height: 1;
+  display: inline-block;
+  padding: 6px 0;
+  border-bottom: 1px solid #80cbc4;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-byline {
+  contain: style;
+  overflow: hidden;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  font-size: 0.8rem;
+  line-height: 1.8em;
+  padding: 1.5rem 0;
+  min-height: 1.8em;
+}
+
+
+d-byline .byline {
+  grid-template-columns: 1fr 1fr;
+  grid-column: text;
+}
+
+@media(min-width: 768px) {
+  d-byline .byline {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+  }
+}
+
+d-byline .authors-affiliations {
+  grid-column-end: span 3;
+  grid-template-columns: 1fr 1fr 1fr;
+  margin-bottom: 1em;
+}
+
+@media(min-width: 768px) {
+  d-byline .authors-affiliations {
+    margin-bottom: 0;
+  }
+}
+
+d-byline h3 {
+  font-size: 0.6rem;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.5);
+  margin: 0;
+  text-transform: uppercase;
+}
+
+d-byline p {
+  margin: 0;
+}
+
+d-byline a,
+d-article d-byline a {
+  color: rgba(0, 0, 0, 0.8);
+  text-decoration: none;
+  border-bottom: none;
+}
+
+d-article d-byline a:hover {
+  text-decoration: underline;
+  border-bottom: none;
+}
+
+d-byline p.author {
+  font-weight: 500;
+}
+
+d-byline .affiliations {
+
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-article {
+  contain: layout style;
+ border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding-top: 2rem;
+  color: rgba(0, 0, 0, 0.8);
+}
+
+d-article > * {
+  grid-column: text;
+}
+
+@media(min-width: 768px) {
+  d-article {
+    font-size: 16px;
+  }
+}
+
+@media(min-width: 1024px) {
+  d-article {
+    font-size: 1.06rem;
+    line-height: 1.7em;
+  }
+}
+
+
+/* H2 */
+
+
+d-article .marker {
+  text-decoration: none;
+  border: none;
+  counter-reset: section;
+  grid-column: kicker;
+  line-height: 1.7em;
+}
+
+d-article .marker:hover {
+  border: none;
+}
+
+d-article .marker span {
+  padding: 0 3px 4px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  position: relative;
+  top: 4px;
+}
+
+d-article .marker:hover span {
+  color: rgba(0, 0, 0, 0.7);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.7);
+}
+
+d-article h2 {
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 1.25em;
+  margin: 2rem 0 1.5rem 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  padding-bottom: 1rem;
+}
+
+@media(min-width: 1024px) {
+  d-article h2 {
+    font-size: 36px;
+  }
+}
+
+/* H3 */
+
+d-article h3 {
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.4em;
+  margin-bottom: 1em;
+  margin-top: 2em;
+}
+
+@media(min-width: 1024px) {
+  d-article h3 {
+    font-size: 20px;
+  }
+}
+
+/* H4 */
+
+d-article h4 {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 14px;
+  line-height: 1.4em;
+}
+
+d-article a {
+  color: inherit;
+}
+
+d-article p,
+d-article ul,
+d-article ol,
+d-article blockquote {
+  margin-top: 0;
+  margin-bottom: 1em;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+d-article blockquote {
+  border-left: 2px solid rgba(0, 0, 0, 0.2);
+  padding-left: 2em;
+  font-style: italic;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+d-article a {
+  border-bottom: 1px solid var(--global-underline-color);
+  text-decoration: none;
+}
+
+d-article a:hover {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.8);
+}
+
+d-article .link {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+d-article ul,
+d-article ol {
+  padding-left: 24px;
+}
+
+d-article li {
+  margin-bottom: 1em;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+d-article li:last-child {
+  margin-bottom: 0;
+}
+
+d-article pre {
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+d-article hr {
+  grid-column: screen;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  margin-top: 60px;
+  margin-bottom: 60px;
+}
+
+d-article section {
+  margin-top: 60px;
+  margin-bottom: 60px;
+}
+
+d-article span.equation-mimic {
+  font-family: georgia;
+  font-size: 115%;
+  font-style: italic;
+}
+
+d-article > d-code,
+d-article section > d-code  {
+  display: block;
+}
+
+d-article > d-math[block],
+d-article section > d-math[block]  {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  d-article > d-code,
+  d-article section > d-code,
+  d-article > d-math[block],
+  d-article section > d-math[block] {
+      overflow-x: scroll;
+      -ms-overflow-style: none;  // IE 10+
+      overflow: -moz-scrollbars-none;  // Firefox
+  }
+
+  d-article > d-code::-webkit-scrollbar,
+  d-article section > d-code::-webkit-scrollbar,
+  d-article > d-math[block]::-webkit-scrollbar,
+  d-article section > d-math[block]::-webkit-scrollbar {
+    display: none;  // Safari and Chrome
+  }
+}
+
+d-article .citation {
+  color: #668;
+  cursor: pointer;
+}
+
+d-include {
+  width: auto;
+  display: block;
+}
+
+d-figure {
+  contain: layout style;
+}
+
+/* KaTeX */
+
+.katex, .katex-prerendered {
+  contain: style;
+  display: inline-block;
+}
+
+/* Tables */
+
+d-article table {
+  border-collapse: collapse;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+d-article table th {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+d-article table td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+d-article table tr:last-of-type td {
+  border-bottom: none;
+}
+
+d-article table th,
+d-article table td {
+  font-size: 15px;
+  padding: 2px 8px;
+}
+
+d-article table tbody :first-child td {
+  padding-top: 2px;
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+span.katex-display {
+  text-align: left;
+  padding: 8px 0 8px 0;
+  margin: 0.5em 0 0.5em 1em;
+}
+
+span.katex {
+  -webkit-font-smoothing: antialiased;
+;
+  font-size: 1.18em;
+}
+
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@media print {
+
+  @page {
+    size: 8in 11in;
+    @bottom-right {
+      content: counter(page) " of " counter(pages);
+    }
+  }
+
+  html {
+    /* no general margins -- CSS Grid takes care of those */
+  }
+
+  p, code {
+    page-break-inside: avoid;
+  }
+
+  h2, h3 {
+    page-break-after: avoid;
+  }
+
+  d-header {
+    visibility: hidden;
+  }
+
+  d-footer {
+    display: none!important;
+  }
+
+}
+</style><script src="https://jax-ml.github.io/scaling-book/assets/js/theme.js?9a0c749ec5240d9cda97bc72359a72c0"></script> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/jekyll-pygments-themes-native.css?5847e5ed4a4568527aa6cfab446049ca" id="highlight_theme_dark" media="none" rel="stylesheet"/> <script>
+    initTheme();
+  </script> <script src="https://jax-ml.github.io/scaling-book/assets/js/distillpub/template.v2.js"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/distillpub/transforms.v2.js"></script> <style type="text/css">{{page._styles}}</style> <style type="text/css">/* Chart.js */
+@-webkit-keyframes chartjs-render-animation{from{opacity:0.99}to{opacity:1}}@keyframes chartjs-render-animation{from{opacity:0.99}to{opacity:1}}.chartjs-render-monitor{-webkit-animation:chartjs-render-animation 0.001s;animation:chartjs-render-animation 0.001s;}</style><style type="text/css">.medium-zoom-overlay{position:fixed;top:0;right:0;bottom:0;left:0;opacity:0;transition:opacity .3s;will-change:opacity}.medium-zoom--opened .medium-zoom-overlay{cursor:pointer;cursor:zoom-out;opacity:1}.medium-zoom-image{cursor:pointer;cursor:zoom-in;transition:transform .3s cubic-bezier(.2,0,.2,1)!important}.medium-zoom-image--hidden{visibility:hidden}.medium-zoom-image--opened{position:relative;cursor:pointer;cursor:zoom-out;will-change:transform}</style><style type="text/css">.CtxtMenu_InfoClose {  top:.2em; right:.2em;}
+.CtxtMenu_InfoContent {  overflow:auto; text-align:left; font-size:80%;  padding:.4em .6em; border:1px inset; margin:1em 0px;  max-height:20em; max-width:30em; background-color:#EEEEEE;  white-space:normal;}
+.CtxtMenu_Info.CtxtMenu_MousePost {outline:none;}
+.CtxtMenu_Info {  position:fixed; left:50%; width:auto; text-align:center;  border:3px outset; padding:1em 2em; background-color:#DDDDDD;  color:black;  cursor:default; font-family:message-box; font-size:120%;  font-style:normal; text-indent:0; text-transform:none;  line-height:normal; letter-spacing:normal; word-spacing:normal;  word-wrap:normal; white-space:nowrap; float:none; z-index:201;  border-radius: 15px;                     /* Opera 10.5 and IE9 */  -webkit-border-radius:15px;               /* Safari and Chrome */  -moz-border-radius:15px;                  /* Firefox */  -khtml-border-radius:15px;                /* Konqueror */  box-shadow:0px 10px 20px #808080;         /* Opera 10.5 and IE9 */  -webkit-box-shadow:0px 10px 20px #808080; /* Safari 3 & Chrome */  -moz-box-shadow:0px 10px 20px #808080;    /* Forefox 3.5 */  -khtml-box-shadow:0px 10px 20px #808080;  /* Konqueror */  filter:progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color="gray", Positive="true"); /* IE */}
+</style><style type="text/css">.CtxtMenu_MenuClose {  position:absolute;  cursor:pointer;  display:inline-block;  border:2px solid #AAA;  border-radius:18px;  -webkit-border-radius: 18px;             /* Safari and Chrome */  -moz-border-radius: 18px;                /* Firefox */  -khtml-border-radius: 18px;              /* Konqueror */  font-family: "Courier New", Courier;  font-size:24px;  color:#F0F0F0}
+.CtxtMenu_MenuClose span {  display:block; background-color:#AAA; border:1.5px solid;  border-radius:18px;  -webkit-border-radius: 18px;             /* Safari and Chrome */  -moz-border-radius: 18px;                /* Firefox */  -khtml-border-radius: 18px;              /* Konqueror */  line-height:0;  padding:8px 0 6px     /* may need to be browser-specific */}
+.CtxtMenu_MenuClose:hover {  color:white!important;  border:2px solid #CCC!important}
+.CtxtMenu_MenuClose:hover span {  background-color:#CCC!important}
+.CtxtMenu_MenuClose:hover:focus {  outline:none}
+</style><style type="text/css">.CtxtMenu_Menu {  position:absolute;  background-color:white;  color:black;  width:auto; padding:5px 0px;  border:1px solid #CCCCCC; margin:0; cursor:default;  font: menu; text-align:left; text-indent:0; text-transform:none;  line-height:normal; letter-spacing:normal; word-spacing:normal;  word-wrap:normal; white-space:nowrap; float:none; z-index:201;  border-radius: 5px;                     /* Opera 10.5 and IE9 */  -webkit-border-radius: 5px;             /* Safari and Chrome */  -moz-border-radius: 5px;                /* Firefox */  -khtml-border-radius: 5px;              /* Konqueror */  box-shadow:0px 10px 20px #808080;         /* Opera 10.5 and IE9 */  -webkit-box-shadow:0px 10px 20px #808080; /* Safari 3 & Chrome */  -moz-box-shadow:0px 10px 20px #808080;    /* Forefox 3.5 */  -khtml-box-shadow:0px 10px 20px #808080;  /* Konqueror */}
+.CtxtMenu_MenuItem {  padding: 1px 2em;  background:transparent;}
+.CtxtMenu_MenuArrow {  position:absolute; right:.5em; padding-top:.25em; color:#666666;  font-family: null; font-size: .75em}
+.CtxtMenu_MenuActive .CtxtMenu_MenuArrow {color:white}
+.CtxtMenu_MenuArrow.CtxtMenu_RTL {left:.5em; right:auto}
+.CtxtMenu_MenuCheck {  position:absolute; left:.7em;  font-family: null}
+.CtxtMenu_MenuCheck.CtxtMenu_RTL { right:.7em; left:auto }
+.CtxtMenu_MenuRadioCheck {  position:absolute; left: .7em;}
+.CtxtMenu_MenuRadioCheck.CtxtMenu_RTL {  right: .7em; left:auto}
+.CtxtMenu_MenuInputBox {  padding-left: 1em; right:.5em; color:#666666;  font-family: null;}
+.CtxtMenu_MenuInputBox.CtxtMenu_RTL {  left: .1em;}
+.CtxtMenu_MenuComboBox {  left:.1em; padding-bottom:.5em;}
+.CtxtMenu_MenuSlider {  left: .1em;}
+.CtxtMenu_SliderValue {  position:absolute; right:.1em; padding-top:.25em; color:#333333;  font-size: .75em}
+.CtxtMenu_SliderBar {  outline: none; background: #d3d3d3}
+.CtxtMenu_MenuLabel {  padding: 1px 2em 3px 1.33em;  font-style:italic}
+.CtxtMenu_MenuRule {  border-top: 1px solid #DDDDDD;  margin: 4px 3px;}
+.CtxtMenu_MenuDisabled {  color:GrayText}
+.CtxtMenu_MenuActive {  background-color: #606872;  color: white;}
+.CtxtMenu_MenuDisabled:focus {  background-color: #E8E8E8}
+.CtxtMenu_MenuLabel:focus {  background-color: #E8E8E8}
+.CtxtMenu_ContextMenu:focus {  outline:none}
+.CtxtMenu_ContextMenu .CtxtMenu_MenuItem:focus {  outline:none}
+.CtxtMenu_SelectionMenu {  position:relative; float:left;  border-bottom: none; -webkit-box-shadow:none; -webkit-border-radius:0px; }
+.CtxtMenu_SelectionItem {  padding-right: 1em;}
+.CtxtMenu_Selection {  right: 40%; width:50%; }
+.CtxtMenu_SelectionBox {  padding: 0em; max-height:20em; max-width: none;  background-color:#FFFFFF;}
+.CtxtMenu_SelectionDivider {  clear: both; border-top: 2px solid #000000;}
+.CtxtMenu_Menu .CtxtMenu_MenuClose {  top:-10px; left:-10px}
+</style><style id="MJX-CHTML-styles">
+mjx-container[jax="CHTML"] {
+  line-height: 0;
+}
+
+mjx-container [space="1"] {
+  margin-left: .111em;
+}
+
+mjx-container [space="2"] {
+  margin-left: .167em;
+}
+
+mjx-container [space="3"] {
+  margin-left: .222em;
+}
+
+mjx-container [space="4"] {
+  margin-left: .278em;
+}
+
+mjx-container [space="5"] {
+  margin-left: .333em;
+}
+
+mjx-container [rspace="1"] {
+  margin-right: .111em;
+}
+
+mjx-container [rspace="2"] {
+  margin-right: .167em;
+}
+
+mjx-container [rspace="3"] {
+  margin-right: .222em;
+}
+
+mjx-container [rspace="4"] {
+  margin-right: .278em;
+}
+
+mjx-container [rspace="5"] {
+  margin-right: .333em;
+}
+
+mjx-container [size="s"] {
+  font-size: 70.7%;
+}
+
+mjx-container [size="ss"] {
+  font-size: 50%;
+}
+
+mjx-container [size="Tn"] {
+  font-size: 60%;
+}
+
+mjx-container [size="sm"] {
+  font-size: 85%;
+}
+
+mjx-container [size="lg"] {
+  font-size: 120%;
+}
+
+mjx-container [size="Lg"] {
+  font-size: 144%;
+}
+
+mjx-container [size="LG"] {
+  font-size: 173%;
+}
+
+mjx-container [size="hg"] {
+  font-size: 207%;
+}
+
+mjx-container [size="HG"] {
+  font-size: 249%;
+}
+
+mjx-container [width="full"] {
+  width: 100%;
+}
+
+mjx-box {
+  display: inline-block;
+}
+
+mjx-block {
+  display: block;
+}
+
+mjx-itable {
+  display: inline-table;
+}
+
+mjx-row {
+  display: table-row;
+}
+
+mjx-row > * {
+  display: table-cell;
+}
+
+mjx-mtext {
+  display: inline-block;
+}
+
+mjx-mstyle {
+  display: inline-block;
+}
+
+mjx-merror {
+  display: inline-block;
+  color: red;
+  background-color: yellow;
+}
+
+mjx-mphantom {
+  visibility: hidden;
+}
+
+_::-webkit-full-page-media, _:future, :root mjx-container {
+  will-change: opacity;
+}
+
+mjx-assistive-mml {
+  position: absolute !important;
+  top: 0px;
+  left: 0px;
+  clip: rect(1px, 1px, 1px, 1px);
+  padding: 1px 0px 0px 0px !important;
+  border: 0px !important;
+  display: block !important;
+  width: auto !important;
+  overflow: hidden !important;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+mjx-assistive-mml[display="block"] {
+  width: 100% !important;
+}
+
+mjx-c::before {
+  display: block;
+  width: 0;
+}
+
+.MJX-TEX {
+  font-family: MJXZERO, MJXTEX;
+}
+
+.TEX-B {
+  font-family: MJXZERO, MJXTEX-B;
+}
+
+.TEX-I {
+  font-family: MJXZERO, MJXTEX-I;
+}
+
+.TEX-MI {
+  font-family: MJXZERO, MJXTEX-MI;
+}
+
+.TEX-BI {
+  font-family: MJXZERO, MJXTEX-BI;
+}
+
+.TEX-S1 {
+  font-family: MJXZERO, MJXTEX-S1;
+}
+
+.TEX-S2 {
+  font-family: MJXZERO, MJXTEX-S2;
+}
+
+.TEX-S3 {
+  font-family: MJXZERO, MJXTEX-S3;
+}
+
+.TEX-S4 {
+  font-family: MJXZERO, MJXTEX-S4;
+}
+
+.TEX-A {
+  font-family: MJXZERO, MJXTEX-A;
+}
+
+.TEX-C {
+  font-family: MJXZERO, MJXTEX-C;
+}
+
+.TEX-CB {
+  font-family: MJXZERO, MJXTEX-CB;
+}
+
+.TEX-FR {
+  font-family: MJXZERO, MJXTEX-FR;
+}
+
+.TEX-FRB {
+  font-family: MJXZERO, MJXTEX-FRB;
+}
+
+.TEX-SS {
+  font-family: MJXZERO, MJXTEX-SS;
+}
+
+.TEX-SSB {
+  font-family: MJXZERO, MJXTEX-SSB;
+}
+
+.TEX-SSI {
+  font-family: MJXZERO, MJXTEX-SSI;
+}
+
+.TEX-SC {
+  font-family: MJXZERO, MJXTEX-SC;
+}
+
+.TEX-T {
+  font-family: MJXZERO, MJXTEX-T;
+}
+
+.TEX-V {
+  font-family: MJXZERO, MJXTEX-V;
+}
+
+.TEX-VB {
+  font-family: MJXZERO, MJXTEX-VB;
+}
+
+mjx-stretchy-v mjx-c, mjx-stretchy-h mjx-c {
+  font-family: MJXZERO, MJXTEX-S1, MJXTEX-S4, MJXTEX, MJXTEX-A ! important;
+}
+
+@font-face /* 0 */ {
+  font-family: MJXZERO;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Zero.woff") format("woff");
+}
+
+@font-face /* 1 */ {
+  font-family: MJXTEX;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Main-Regular.woff") format("woff");
+}
+
+@font-face /* 2 */ {
+  font-family: MJXTEX-B;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Main-Bold.woff") format("woff");
+}
+
+@font-face /* 3 */ {
+  font-family: MJXTEX-I;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Math-Italic.woff") format("woff");
+}
+
+@font-face /* 4 */ {
+  font-family: MJXTEX-MI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Main-Italic.woff") format("woff");
+}
+
+@font-face /* 5 */ {
+  font-family: MJXTEX-BI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Math-BoldItalic.woff") format("woff");
+}
+
+@font-face /* 6 */ {
+  font-family: MJXTEX-S1;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size1-Regular.woff") format("woff");
+}
+
+@font-face /* 7 */ {
+  font-family: MJXTEX-S2;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size2-Regular.woff") format("woff");
+}
+
+@font-face /* 8 */ {
+  font-family: MJXTEX-S3;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size3-Regular.woff") format("woff");
+}
+
+@font-face /* 9 */ {
+  font-family: MJXTEX-S4;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size4-Regular.woff") format("woff");
+}
+
+@font-face /* 10 */ {
+  font-family: MJXTEX-A;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_AMS-Regular.woff") format("woff");
+}
+
+@font-face /* 11 */ {
+  font-family: MJXTEX-C;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Calligraphic-Regular.woff") format("woff");
+}
+
+@font-face /* 12 */ {
+  font-family: MJXTEX-CB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Calligraphic-Bold.woff") format("woff");
+}
+
+@font-face /* 13 */ {
+  font-family: MJXTEX-FR;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Fraktur-Regular.woff") format("woff");
+}
+
+@font-face /* 14 */ {
+  font-family: MJXTEX-FRB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Fraktur-Bold.woff") format("woff");
+}
+
+@font-face /* 15 */ {
+  font-family: MJXTEX-SS;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Regular.woff") format("woff");
+}
+
+@font-face /* 16 */ {
+  font-family: MJXTEX-SSB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Bold.woff") format("woff");
+}
+
+@font-face /* 17 */ {
+  font-family: MJXTEX-SSI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Italic.woff") format("woff");
+}
+
+@font-face /* 18 */ {
+  font-family: MJXTEX-SC;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Script-Regular.woff") format("woff");
+}
+
+@font-face /* 19 */ {
+  font-family: MJXTEX-T;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Typewriter-Regular.woff") format("woff");
+}
+
+@font-face /* 20 */ {
+  font-family: MJXTEX-V;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Vector-Regular.woff") format("woff");
+}
+
+@font-face /* 21 */ {
+  font-family: MJXTEX-VB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Vector-Bold.woff") format("woff");
+}
+</style><link crossorigin="anonymous" href="https://distill.pub/third-party/katex/katex.min.css" rel="stylesheet"/><script async="" src="https://distill.pub/third-party/katex/katex.min.js"></script></head>
+<body> <d-front-matter> <script async="" type="text/json">
+      {
+            "title": "如何扩展你的模型",
+            "description": "训练LLM通常感觉像炼金术，但理解和优化你的模型性能并非如此。本书旨在揭开语言模型扩展科学的神秘面纱：TPU（和GPU）是如何工作的，它们之间如何通信，LLM如何在真实硬件上运行，以及如何在训练和推理过程中并行化你的模型，使其能在大规模下高效运行。如果你曾想过‘训练这个LLM应该有多昂贵’或‘我需要多少内存来自己部署这个模型’或‘什么是AllGather’，我们希望这本书对你有所帮助。",
+            "published": "February 04, 2025",
+            "authors": [
+
+              {
+                "author": "Jacob Austin",
+                "authorURL": "https://www.jacobaustin.org/",
+                "affiliations": [
+                  {
+                    "name": "Google DeepMind",
+                    "url": ""
+                  }
+                ]
+              },
+
+              {
+                "author": "Sholto Douglas",
+                "authorURL": "https://x.com/_sholtodouglas",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+
+              {
+                "author": "Roy Frostig",
+                "authorURL": "https://cs.stanford.edu/~rfrostig/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+
+              {
+                "author": "Anselm Levskaya",
+                "authorURL": "https://anselmlevskaya.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+
+              {
+                "author": "Charlie Chen",
+                "authorURL": "https://x.com/charliexychen",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+
+              {
+                "author": "Sharad Vikram",
+                "authorURL": "https://sharadvikram.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+
+              {
+                "author": "Federico Lebron",
+                "authorURL": "https://fedelebron.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+
+              {
+                "author": "Peter Choy",
+                "authorURL": "https://x.com/pchoy95",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+
+              {
+                "author": "Vinay Ramasesh",
+                "authorURL": "https://x.com/vinayramasesh",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+
+              {
+                "author": "Albert Webson",
+                "authorURL": "https://representation.ai/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+
+              {
+                "author": "Reiner Pope<sup>*</sup>",
+                "authorURL": "https://x.com/reinerpope",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              }
+
+            ],
+            "katex": {
+              "delimiters": [
+                {
+                  "left": "$",
+                  "right": "$",
+                  "display": false
+                },
+                {
+                  "left": "$$",
+                  "right": "$$",
+                  "display": true
+                }
+              ]
+            }
+          }
+    </script> </d-front-matter> <header> <script>
+    function goToTop() {
+      document.body.scrollTop = 0; // For Safari
+      document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+    }
+
+    // When the user scrolls down 20px from the top of the document, show the button
+    window.onscroll = function() {scrollFunction()};
+
+    function scrollFunction() {
+      // Get the button:
+      let mybutton = document.getElementById("top-button");
+
+      if (document.body.scrollTop > 40 || document.documentElement.scrollTop > 40) {
+        mybutton.style.display = "block";
+      } else {
+        mybutton.style.display = "none";
+      }
+  }
+  </script> <nav class="navbar navbar-light navbar-expand-sm fixed-top" id="navbar" role="navigation"> <div class="container"> <a class="navbar-brand title font-weight-lighter" href="scaling-book.html"> 如何扩展你的模型 </a> <button aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler collapsed ml-auto" data-target="#navbarNav" data-toggle="collapse" type="button"> <span class="sr-only">切换导航</span> <span class="icon-bar top-bar"></span> <span class="icon-bar middle-bar"></span> <span class="icon-bar bottom-bar"></span> </button> <div class="left-button section-button"><a href=""><svg viewbox="-78.5 0 512 512"><path d="M257 64L291 98 128 262 291 426 257 460 61 262 257 64Z"></path></svg></a></div> <div class="right-button section-button"><a href="roofline.html"><svg viewbox="-78.5 0 512 512"><path d="M98 460L64 426 227 262 64 98 98 64 294 262 98 460Z"></path></svg></a></div> <div class="collapse navbar-collapse text-right" id="navbarNav"> <ul class="navbar-nav ml-auto flex-nowrap"> <li class="nav-item"> <a class="nav-link" href="scaling-book.html"> </a> </li> <li class="nav-item nav-hidden"><a class="nav-link" id="top-button" onclick="goToTop()" style="display: none;">返回顶部</a></li> <li class="nav-item nav-hidden"><p class="nav-link"></p></li> <li class="nav-item nav-hidden"><a class="nav-link" href="">上一部分</a></li> <li class="nav-item nav-hidden"><a class="nav-link" href="roofline.html">下一部分</a></li> <li class="nav-item nav-hidden"><p class="nav-link"></p></li> <li class="nav-item dropdown"> <a aria-expanded="false" aria-haspopup="true" class="nav-link dropdown-toggle" data-toggle="dropdown" href="#" id="navbarDropdown" role="button">章节 </a> <div aria-labelledby="navbarDropdown" class="dropdown-menu dropdown-menu-right"> <a class="dropdown-item" href="https://jax-ml.github.io/scaling-book/index">第0部分. 简介</a> <a class="dropdown-item" href="roofline.html">第1部分. 屋顶线模型简介</a> <a class="dropdown-item" href="tpus.html">第2部分. 关于TPU的一切</a> <a class="dropdown-item" href="sharding.html">第3部分. 分片矩阵乘法</a> <a class="dropdown-item" href="transformers.html">第4部分. Transformer</a> <a class="dropdown-item" href="training.html">第5部分. 训练</a> <a class="dropdown-item" href="applied-training.html">第6部分. 训练LLaMA</a> <a class="dropdown-item" href="inference.html">第7部分. 推理</a> <a class="dropdown-item" href="applied-inference.html">第8部分. 部署LLaMA</a> <a class="dropdown-item" href="profiling.html">第9部分. 性能分析</a> <a class="dropdown-item" href="jax-stuff.html">第10部分. 关于JAX的一切</a> <a class="dropdown-item" href="conclusion.html">第11部分. 结论</a> <a class="dropdown-item" href="gpus.html">第12部分. GPU</a> </div> </li> <li class="toggle-container"> <button id="light-toggle" title="Change theme"> <i class="ti ti-sun-moon" id="light-toggle-system"></i> <i class="ti ti-moon-filled" id="light-toggle-dark"></i> <i class="ti ti-sun-filled" id="light-toggle-light"></i> </button> </li> </ul> </div> </div> </nav> <progress id="progress" value="0"> <div class="progress-container"> <span class="progress-bar"></span> </div> </progress> </header> <div class="post distill"><div class="translation-info base-grid" style="margin-bottom: 20px;">
+<div style="grid-column: text;
+                       display: flex;
+                       align-items: center;
+                       justify-content: space-between;
+                       padding: 16px 0;
+                       border-bottom: 1px solid var(--global-text-color-light, rgba(0,0,0,0.15));
+                       font-size: 16px;
+                       line-height: 1.5;
+                       color: var(--global-text-color, currentColor);">
+<div style="display: flex;
+                           flex-direction: column;
+                           gap: 8px;">
+<div>
+<span style="font-weight: 600; color: var(--global-text-color, currentColor);">🔗 英文原文：</span>
+<a href="https://jax-ml.github.io/scaling-book/" onmouseout="this.style.textDecoration='none'" onmouseover="this.style.textDecoration='underline'" rel="noopener noreferrer" style="color: var(--global-theme-color, #004276);
+                                  text-decoration: none;
+                                  margin-left: 4px;" target="_blank">
+                           https://jax-ml.github.io/scaling-book/
+                        </a>
+</div>
+<div>
+<span style="font-weight: 600; color: var(--global-text-color, currentColor);">✍️ 翻译：</span>
+<span style="margin-left: 4px; color: var(--global-text-color, currentColor);">北极的树</span>
+</div>
+</div>
+<div style="flex-shrink: 0;
+                           display: flex;
+                           flex-direction: column;
+                           align-items: center;
+                           gap: 6px;
+                           margin-left: 20px;">
+<img alt="微信二维码" loading="lazy" src="https://wechat-account-1251781786.cos.ap-guangzhou.myqcloud.com/wechat_account.jpeg" style="width: 80px;
+                                height: 80px;
+                                border-radius: 6px;
+                                opacity: 0.9;"/>
+<span style="font-size: 12px;
+                                 color: var(--global-text-color-light, currentColor);
+                                 opacity: 0.8;
+                                 text-align: center;">
+                        微信公众号
+                    </span>
+</div>
+</div>
+</div> <d-title> <h1>如何扩展你的模型</h1> <p><span class="subtitle">TPU上LLM的系统视图</span> <span class="subtitle-links">（第0部分：简介 | <a href="roofline.html">第1部分：屋顶线模型</a>）</span></p> <p>训练LLM通常感觉像炼金术，但理解和优化你的模型性能并非如此。本书旨在揭开语言模型扩展科学的神秘面纱：TPU（和GPU）是如何工作的，它们之间如何通信，LLM如何在真实硬件上运行，以及如何在训练和推理过程中并行化你的模型，使其能在大规模下高效运行。如果你曾想过‘训练这个LLM应该有多昂贵’或‘我需要多少内存来自己部署这个模型’或‘什么是AllGather’，我们希望这本书对你有所帮助。</p> </d-title> <d-byline>
+dai<div class="byline grid">
+<div class="authors-affiliations grid">
+<h3 style="grid-column: 1; grid-row: 1;">作者</h3>
+<h3></h3>
+<h3>所属机构</h3>
+<p class="author" style="grid-column: 1; grid-row: 2;">
+<a class="name" href="https://www.jacobaustin.org/">Jacob Austin</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 2;">
+<span class="affiliation">Google DeepMind</span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 3;">
+<a class="name" href="https://x.com/_sholtodouglas">Sholto Douglas</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 3;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 4;">
+<a class="name" href="https://cs.stanford.edu/~rfrostig/">Roy Frostig</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 4;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 5;">
+<a class="name" href="https://anselmlevskaya.com/">Anselm Levskaya</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 5;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 6;">
+<a class="name" href="https://x.com/charliexychen">Charlie Chen</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 6;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 7;">
+<a class="name" href="https://sharadvikram.com/">Sharad Vikram</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 7;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 2;">
+<a class="name" href="https://fedelebron.com/">Federico Lebron</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 2;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 3;">
+<a class="name" href="https://x.com/pchoy95">Peter Choy</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 3;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 4;">
+<a class="name" href="https://x.com/vinayramasesh">Vinay Ramasesh</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 4;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 5;">
+<a class="name" href="https://representation.ai/">Albert Webson</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 5;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 6;">
+<a class="name" href="https://x.com/reinerpope">Reiner Pope<sup>*</sup></a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 6;">
+<span class="affiliation"></span>
+</p>
+</div>
+<div>
+<h3>发布日期</h3>
+<p>2025年2月4日</p>
+</div>
+</div>
+</d-byline> <d-article> <d-contents> <nav class="l-text figcaption"> <h3>目录</h3> <div> <a href="#high-level-outline">高层大纲</a> </div> <div> <a href="#links-to-sections">各章节链接</a> </div> </nav> </d-contents> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/dragon-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/dragon-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/dragon-1400.webp 1400w" type="image/webp"/> <img class="img-fluid" height="362" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/dragon.png" width="1026"/> </picture> </figure> <p>深度学习的许多方面仍然可以归结为一种黑魔法，但优化你的模型性能并非如此——即使是在巨大规模下！相对简单的原则无处不在——从处理单个加速器到数万个加速器——理解这些原则可以让你做许多有用的事情：</p> <ul> <li>粗略估算你的模型各部分与理论最优值的接近程度。</li> <li>在不同规模下，对不同的并行性方案（如何将计算分配到多个设备上）做出明智的选择。</li> <li>估算训练和运行大型Transformer模型所需的成本和时间。</li> <li>设计能够利用<a href="https://arxiv.org/abs/2205.14135" rel="external nofollow noopener" target="_blank">特定</a><a href="https://arxiv.org/abs/1911.02150" rel="external nofollow noopener" target="_blank">硬件</a><a href="https://arxiv.org/abs/2007.00072" rel="external nofollow noopener" target="_blank">功能</a>的算法。</li> <li>基于对当前算法性能限制的明确理解来设计硬件。</li> </ul> <p><strong>预期背景：</strong>我们假设你对LLM和Transformer架构有基本的了解，但不一定了解它们如何大规模运行。你应该了解LLM训练的基础知识，最好对JAX有一些基本熟悉。一些有用的背景阅读可能包括关于Transformer架构的<a href="https://jalammar.github.io/illustrated-transformer/" rel="external nofollow noopener" target="_blank">这篇博客文章</a>和<a href="https://arxiv.org/abs/1706.03762" rel="external nofollow noopener" target="_blank">原始的Transformer论文</a>。还可以查看<a href="https://jax-ml.github.io/scaling-book/conclusion#further-reading">这个列表</a>以获取更多有用的同步和未来阅读材料。</p> <p><strong>目标与反馈：</strong>读完本书后，你应该能够轻松地为给定硬件平台上的Transformer模型估算出最佳的并行性方案，以及大致的训练和推理时间。如果你做不到，请给我们发邮件或留言！我们很想知道如何能把内容讲得更清楚。</p> <p class="announce">你可能也会喜欢阅读关于NVIDIA GPU的<a href="gpus.html">新的第12节</a>！</p> <h3 id="why-should-you-care">你为什么应该关心？</h3> <p>三四年前，我认为大多数机器学习研究人员不需要理解这本书中的任何内容。但如今，即使是“小”模型也运行得非常接近硬件极限，以至于进行创新性研究需要你考虑大规模下的效率。<d-footnote id="d-footnote-1">历史上，机器学习研究遵循着一种系统创新和软件改进之间的“嘀嗒”循环。Alex Krizhevsky不得不编写极其复杂的CUDA代码来使CNNs变快，但几年内，像Theano和TensorFlow这样的库意味着你不再需要这样做。也许这种情况也会在这里发生，这本书中的所有内容几年后都会被抽象掉。但是，扩展定律已经将我们的模型永久地推向了硬件的最前沿，而且似乎在不久的将来，进行前沿研究将与理解如何有效地将模型扩展到大型硬件拓扑结构密不可分。</d-footnote> <strong>在基准测试上取得20%的提升，如果以牺牲20%的屋顶线效率为代价，那是无关紧要的。</strong> 有前景的模型架构之所以失败，通常要么是因为它们<em>无法</em>在规模上高效运行，要么是因为没有人投入精力去实现这一点。</p> <p><strong>“模型扩展”的目标是能够增加用于训练或推理的芯片数量，同时实现吞吐量的成比例线性增长。</strong>这被称为“<em>强扩展</em>”。尽管增加额外的芯片（“并行性”）通常会减少计算时间，但它也会带来芯片间通信增加的成本。当通信时间超过计算时间时，我们就会变得“受通信限制”，无法实现强扩展。<d-footnote id="d-footnote-2">随着计算时间的减少，你通常也会在单个芯片层面遇到瓶颈。你闪亮的新TPU或GPU可能额定每秒执行500万亿次操作，但如果你不小心，它很可能只做到十分之一，因为它被在内存中移动参数所拖累。单芯片计算、内存带宽和总内存之间的相互作用对扩展的故事至关重要。</d-footnote> 如果我们对硬件有足够的了解，能够预见这些瓶颈将在何处出现，我们就可以设计或重新配置我们的模型来避免它们。<d-footnote id="d-footnote-3">硬件设计者面临着相反的问题：构建能够为我们的算法提供恰到好处的计算、带宽和内存，同时最小化成本的硬件。你可以想象这个“协同设计”问题有多么令人紧张：你必须赌上第一批芯片实际可用时算法会是什么样子，这通常是2到3年之后的事情。TPU的故事就是这场博弈中的一个巨大成功。矩阵乘法是一种独特的算法，因为它每字节内存使用的FLOPs远多于几乎任何其他算法（每字节N FLOPs），早期的TPU及其脉动阵列架构在当时实现了比GPU好得多的性价比。TPU是为ML工作负载设计的，而带有TensorCore的GPU也在迅速改变以填补这一细分市场。但你可以想象，如果神经网络没有兴起，或者以TPU（本质上比GPU灵活性差）无法处理的某种根本方式发生了变化，那将是多么昂贵的代价。</d-footnote></p> <p><em>我们在这本书中的目标是解释TPU（和GPU）硬件是如何工作的，以及Transformer架构是如何演变以在当前硬件上表现良好的。我们希望这对于设计新架构的研究人员和致力于让当前一代LLM快速运行的工程师都有用。</em></p> <h2 id="high-level-outline">高层大纲</h2> <p>本书的总体结构如下：</p> <p><a href="roofline.html">第1节</a>解释了屋顶线分析以及哪些因素会限制我们的扩展能力（通信、计算和内存）。<a href="tpus.html">第2节</a>和<a href="sharding.html">第3节</a>详细讨论了TPU的工作原理，既包括作为单个芯片，也包括——至关重要的——作为一个具有有限带宽和延迟的互连芯片链接的系统。我们将回答以下问题：</p> <ul> <li>一个特定大小的矩阵乘法应该花费多长时间？在什么情况下它会受到计算、内存或通信带宽的限制？</li> <li>TPU是如何连接在一起形成训练集群的？系统的每个部分有多少带宽？</li> <li>在多个TPU之间收集、分散或重新分配数组需要多长时间？</li> <li>我们如何高效地乘以在不同设备上分布不同的矩阵？</li> </ul> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/pointwise-product-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/pointwise-product-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/pointwise-product-1400.webp 1400w" type="image/webp"/> <img class="img-small" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/pointwise-product.gif" width="100%"/> </picture> <figcaption class="caption"><b>图：</b>来自<a href="tpus.html">第2节</a>的图表，展示了TPU如何执行逐元素乘积。根据我们数组的大小和各种链接的带宽，我们可能会发现自己是计算受限（使用全部硬件计算能力）或通信受限（受内存加载瓶颈）。</figcaption> </figure> <p>五年前，机器学习的架构景观丰富多彩——ConvNets、LSTMs、MLPs、Transformers——但现在我们主要只有Transformer<d-cite key="transformers"></d-cite>。我们坚信，理解Transformer架构的每一个部分都是值得的：每个矩阵的确切大小，归一化发生在哪里，每个部分有多少参数和FLOPs<d-footnote id="d-footnote-4">浮点运算（FLoating point OPs），基本上是所需加法和乘法运算的总数。虽然许多资料将FLOPs解释为“每秒操作数”，但我们使用FLOPs/s来明确表示这一点。</d-footnote>。<a href="transformers.html">第4节</a>仔细讲解了这种“Transformer数学”，展示了如何计算训练和推理的参数和FLOPs。这告诉我们模型将使用多少内存，我们将在计算或通信上花费多少时间，以及注意力何时会相对于前馈块变得重要。</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/transformer-diagram-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/transformer-diagram-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/transformer-diagram-1400.webp 1400w" type="image/webp"/> <img class="img-fluid" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/transformer-diagram.png" width="100%"/> </picture> <figcaption class="caption"><b>图：</b>一个标准的Transformer层，每个矩阵乘法（matmul）都用圆圈内的点表示。所有参数（不包括归一化层）都以紫色显示。<a href="transformers.html">第4节</a>更详细地讲解了这个图。</figcaption> </figure> <p><a href="training.html">第5节：训练</a>和<a href="inference.html">第7节：推理</a>是本文的核心，我们在这里讨论一个根本问题：给定一个特定大小的模型和一定数量的芯片，我该如何并行化我的模型以保持在“强扩展”状态？这是一个简单的问题，但答案却出人意料地复杂。从高层次来看，有4种主要的并行性技术用于在多个芯片上拆分模型（<strong>数据</strong>、<strong>张量</strong>、<strong>流水线</strong>和<strong>专家</strong>），以及一些其他技术来减少内存需求（<strong>重计算</strong>、<strong>优化器/模型分片（又名ZeRO）</strong>、<strong>主机卸载</strong>、<strong>梯度累积</strong>）。我们在这里讨论其中的许多技术。</p> <p>我们希望在这些章节结束时，你应该能够为新的架构或设置自己选择合适的并行方案。<a href="applied-training.html">第6节</a>和<a href="applied-inference.html">第8节</a>是将这些概念应用于流行的开源模型LLaMA-3的实践教程。</p> <p>最后，<a href="profiling.html">第9节</a>和<a href="jax-stuff.html">第10节</a>探讨了如何在JAX中实现其中一些想法，以及在出现问题时如何分析和调试代码。<a href="gpus.html">第12节</a>是一个新章节，也深入探讨了GPU。</p> <p>在整个过程中，我们尝试给你提供一些问题让你自己解决。请不要有压力去阅读所有章节或按顺序阅读。也请留下反馈。目前，这是一个草稿，并将继续修订。谢谢！</p> <p><em>我们想感谢James Bradbury和Blake Hechtman，他们推导出了本文档中的许多想法。</em></p> <h3 class="next-section">话不多说，<a href="roofline.html">这是关于TPU屋顶线模型的第一节</a>。</h3> <h2 id="links-to-sections">各章节链接</h2> <p><em>这个系列可能比它需要的要长，但我们希望这不会让你望而却步。前三章是预备知识，如果熟悉可以跳过，尽管它们介绍了后面使用的符号。最后三个部分可能是最实用的，因为它们解释了如何处理真实模型。</em></p> <p><strong>第1部分：预备知识</strong></p> <ul> <li> <p><a href="roofline.html"><strong>第1章：屋顶线分析简介</strong></a>。算法受到三件事的限制：计算、通信和内存。我们可以用这些来近似我们的算法将运行多快。</p> </li> <li> <p><a href="tpus.html"><strong>第2章：如何理解TPU</strong></a>。TPU是如何工作的？这如何影响我们可以训练和服务的模型？</p> </li> <li> <p><a href="sharding.html"><strong>第3章：分片矩阵及其乘法</strong></a>。在这里，我们通过我们最喜欢的操作：（分片）矩阵乘法来解释模型分片和多TPU并行性。</p> </li> </ul> <p><strong>第2部分：Transformer</strong></p> <ul> <li> <p><a href="transformers.html"><strong>第4章：你需要知道的所有Transformer数学知识</strong></a>。一个Transformer在其前向和后向传播中使用了多少FLOPs？你能计算出参数数量吗？它的KV缓存大小？我们在这里详细讲解这些数学计算。</p> </li> <li> <p><a href="training.html"><strong>第5章：如何为训练并行化Transformer</strong></a>。FSDP。Megatron分片。流水线并行性。给定一定数量的芯片，我如何以尽可能高效的方式训练一个给定大小和给定批量大小的模型？</p> </li> <li> <p><a href="applied-training.html"><strong>第6章：在TPU上训练LLaMA 3</strong></a>。我们如何在TPU上训练LLaMA 3？需要多长时间？成本是多少？</p> </li> <li> <p><a href="inference.html"><strong>第7章：关于Transformer推理的一切</strong></a>。一旦我们训练好一个模型，我们就必须部署它。推理增加了一个新的考虑因素——延迟——并改变了内存的格局。我们将讨论解耦服务是如何工作的以及如何考虑KV缓存。</p> </li> <li> <p><a href="applied-inference.html"><strong>第8章：在TPU上部署LLaMA 3</strong></a>。在TPU v5e上部署LLaMA 3的成本是多少？延迟/吞吐量的权衡是什么？</p> </li> </ul> <p><strong>第3部分：实践教程</strong></p> <ul> <li> <p><a href="profiling.html"><strong>第9章：如何分析TPU代码</strong></a>。真实的LLM从不像上面的理论那么简单。在这里，我们解释JAX + XLA技术栈以及如何使用JAX/TensorBoard分析器来调试和修复实际问题。</p> </li> <li> <p><a href="jax-stuff.html"><strong>第10章：用JAX编程TPU</strong></a>。JAX提供了一系列神奇的API用于并行化计算，但你需要知道如何使用它们。包含有趣的例子和已解决的问题。</p> </li> </ul> <p><strong>第4部分：结论和附加内容</strong></p> <ul> <li> <p><a href="conclusion.html"><strong>第11章：结论和进一步阅读</strong></a>。关于TPU和LLM的总结思考和进一步阅读材料。</p> </li> <li> <p><a href="gpus.html"><strong>第12章：如何理解GPU</strong></a>。一个关于GPU的附加章节，介绍它们如何工作，如何联网，以及它们的屋顶线与TPU有何不同。</p> </li> </ul> </d-article> <d-appendix>
+<style>
+
+d-appendix {
+  contain: layout style;
+  font-size: 0.8em;
+  line-height: 1.7em;
+  margin-top: 60px;
+  margin-bottom: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  color: rgba(0,0,0,0.5);
+  padding-top: 60px;
+  padding-bottom: 48px;
+}
+
+d-appendix h3 {
+  grid-column: page-start / text-start;
+  font-size: 15px;
+  font-weight: 500;
+  margin-top: 1em;
+  margin-bottom: 0;
+  color: rgba(0,0,0,0.65);
+}
+
+d-appendix h3 + * {
+  margin-top: 1em;
+}
+
+d-appendix ol {
+  padding: 0 0 0 15px;
+}
+
+@media (min-width: 768px) {
+  d-appendix ol {
+    padding: 0 0 0 30px;
+    margin-left: -30px;
+  }
+}
+
+d-appendix li {
+  margin-bottom: 1em;
+}
+
+d-appendix a {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+d-appendix > * {
+  grid-column: text;
+}
+
+d-appendix > d-footnote-list,
+d-appendix > d-citation-list,
+d-appendix > distill-appendix {
+  grid-column: screen;
+}
+
+</style>
+<d-footnote-list style="">
+<style>
+
+d-footnote-list {
+  contain: layout style;
+}
+
+d-footnote-list > * {
+  grid-column: text;
+}
+
+d-footnote-list a.footnote-backlink {
+  color: rgba(0,0,0,0.3);
+  padding-left: 0.5em;
+}
+
+</style>
+<h3>脚注</h3>
+<ol><li id="d-footnote-1-listing">历史上，机器学习研究遵循着一种系统创新和软件改进之间的“嘀嗒”循环。Alex Krizhevsky不得不编写极其复杂的CUDA代码来使CNNs变快，但几年内，像Theano和TensorFlow这样的库意味着你不再需要这样做。也许这种情况也会在这里发生，这本书中的所有内容几年后都会被抽象掉。但是，扩展定律已经将我们的模型永久地推向了硬件的最前沿，而且似乎在不久的将来，进行前沿研究将与理解如何有效地将模型扩展到大型硬件拓扑结构密不可分。<a class="footnote-backlink" href="#d-footnote-1">[↩]</a></li><li id="d-footnote-2-listing">随着计算时间的减少，你通常也会在单个芯片层面遇到瓶颈。你闪亮的新TPU或GPU可能额定每秒执行500万亿次操作，但如果你不小心，它很可能只做到十分之一，因为它被在内存中移动参数所拖累。单芯片计算、内存带宽和总内存之间的相互作用对扩展的故事至关重要。<a class="footnote-backlink" href="#d-footnote-2">[↩]</a></li><li id="d-footnote-3-listing">硬件设计者面临着相反的问题：构建能够为我们的算法提供恰到好处的计算、带宽和内存，同时最小化成本的硬件。你可以想象这个“协同设计”问题有多么令人紧张：你必须赌上第一批芯片实际可用时算法会是什么样子，这通常是2到3年之后的事情。TPU的故事就是这场博弈中的一个巨大成功。矩阵乘法是一种独特的算法，因为它每字节内存使用的FLOPs远多于几乎任何其他算法（每字节N FLOPs），早期的TPU及其脉动阵列架构在当时实现了比GPU好得多的性价比。TPU是为ML工作负载设计的，而带有TensorCore的GPU也在迅速改变以填补这一细分市场。但你可以想象，如果神经网络没有兴起，或者以TPU（本质上比GPU灵活性差）无法处理的某种根本方式发生了变化，那将是多么昂贵的代价。<a class="footnote-backlink" href="#d-footnote-3">[↩]</a></li><li id="d-footnote-4-listing">浮点运算（FLoating point OPs），基本上是所需加法和乘法运算的总数。虽然许多资料将FLOPs解释为“每秒操作数”，但我们使用FLOPs/s来明确表示这一点。<a class="footnote-backlink" href="#d-footnote-4">[↩]</a></li></ol>
+</d-footnote-list> <d-citation-list style=""><style>
+d-citation-list {
+  contain: style;
+}
+
+d-citation-list .references {
+  grid-column: text;
+}
+
+d-citation-list .references .title {
+  font-weight: 500;
+}
+</style><h3 id="references">参考文献</h3><ol class="references" id="references-list"><li id="transformers"><span class="title">Attention is all you need</span> <br/>Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A.N., Kaiser, L. and Polosukhin, I., 2017. arXiv [cs.CL]. </li></ol></d-citation-list> <div class="base-grid appendix-entry"> <h3 style="grid-column: 0;">杂项</h3> <p class="author-footnote" style="grid-column: text;"><sup>*</sup>在Google DeepMind完成的工作，现就职于MatX。</p> </div> <div class="base-grid appendix-entry"> <h3 style="grid-column: 0;">引用</h3> <p class="author-footnote">在学术背景下进行署名时，请按如下方式引用本作品：</p> <div class="author-footnote"> <div class="language-bibtex highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code>    <span class="c">Austin et al., "How to Scale Your Model", Google DeepMind, online, 2025.</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> </div> <p class="author-footnote">或使用以下BibTeX条目：</p> <div class="author-footnote"> <div class="language-bibtex highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code>    <span class="nc">@article</span><span class="p">{</span><span class="nl">scaling-book</span><span class="p">,</span>
+      <span class="na">title</span> <span class="p">=</span> <span class="s">{How to Scale Your Model}</span><span class="p">,</span>
+      <span class="na">author</span> <span class="p">=</span> <span class="s">{Austin, Jacob and Douglas, Sholto and Frostig, Roy and Levskaya, Anselm and Chen, Charlie and Vikram, Sharad
+      and Lebron, Federico and Choy, Peter and Ramasesh, Vinay and Webson, Albert and Pope, Reiner}</span><span class="p">,</span>
+      <span class="na">publisher</span> <span class="p">=</span> <span class="s">{Google DeepMind}</span><span class="p">,</span>
+      <span class="na">howpublished</span> <span class="p">=</span> <span class="s">{Online}</span><span class="p">,</span>
+      <span class="na">note</span> <span class="p">=</span> <span class="s">{Retrieved from https://jax-ml.github.io/scaling-book/}</span><span class="p">,</span>
+      <span class="na">year</span> <span class="p">=</span> <span class="s">{2025}</span>
+    <span class="p">}</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> </div> </div> </d-appendix> <d-bibliography src="/scaling-book/assets/bibliography/main.bib"></d-bibliography> <div id="giscus_thread" style="max-width: 930px; margin: 0 auto;"> <script>
+      let giscusTheme = determineComputedTheme();
+      let giscusAttributes = {
+        src: 'https://giscus.app/client.js',
+        'data-repo': 'jax-ml/scaling-book',
+        'data-repo-id': '',
+        'data-category': 'General',
+        'data-category-id': '',
+        'data-mapping': 'title',
+        'data-strict': '0',
+        'data-reactions-enabled': '1',
+        'data-emit-metadata': '0',
+        'data-input-position': 'bottom',
+        'data-theme': giscusTheme,
+        'data-loading': '1',
+        'data-lang': 'en',
+        crossorigin: 'anonymous',
+        async: '',
+      };
+
+      let giscusScript = document.createElement('script');
+      Object.entries(giscusAttributes).forEach(([key, value]) => giscusScript.setAttribute(key, value));
+      document.getElementById('giscus_thread').appendChild(giscusScript);
+    </script><script async="" crossorigin="anonymous" data-category="General" data-category-id="" data-emit-metadata="0" data-input-position="bottom" data-lang="en" data-loading="1" data-mapping="title" data-reactions-enabled="1" data-repo="jax-ml/scaling-book" data-repo-id="" data-strict="0" data-theme="light" src="https://giscus.app/client.js"></script><div class="giscus"><iframe allow="clipboard-write" class="giscus-frame giscus-frame--loading" scrolling="no" src="https://giscus.app/en/widget?origin=https%3A%2F%2Fjax-ml.github.io%2Fscaling-book%2F&amp;session=&amp;theme=light&amp;reactionsEnabled=1&amp;emitMetadata=0&amp;inputPosition=bottom&amp;repo=jax-ml%2Fscaling-book&amp;repoId=&amp;category=General&amp;categoryId=&amp;strict=0&amp;description=Training+LLMs+often+feels+like+alchemy%2C+but+understanding+and+optimizing+the+performance+of+your+models+doesn%27t+have+to.+This+book+aims+to+demystify+the+science+of+scaling+language+models%3A+how+TPUs+%28and+GPUs%29+work+and+how+they+communicate+with+each+other%2C+how+LLMs+run+on+real+hardware%2C+and+how+to+parallelize+your+models+during+training+and+inference+so+they+run+efficiently+at+massive+scale.+If+you%27ve+ever+wondered+%E2%80%9Chow+expensive+should+this+LLM+be+to+train%E2%80%9D+or+%E2%80%9Chow+much+memory+do+I+need+to+serve+this+model+myself%E2%80%9D+or+%E2%80%9Cwhat%27s+an+AllGather%E2%80%9D%2C+we+hope+this+will+be+useful+to+you.&amp;backLink=https%3A%2F%2Fjax-ml.github.io%2Fscaling-book%2F&amp;term=How+To+Scale+Your+Model" style="opacity: 0;" title="Comments"></iframe></div> <noscript>请启用JavaScript以查看由giscus驱动的<a href="http://giscus.app/?ref_noscript" rel="external nofollow noopener" target="_blank">评论</a>。 </noscript> </div> </div> <footer class="sticky-bottom mt-5" role="contentinfo"> <div class="container"> © 版权所有 2025 . 由 <a href="https://jekyllrb.com/" rel="external nofollow noopener" target="_blank">Jekyll</a> 驱动，使用 <a href="https://github.com/alshedivat/al-folio" rel="external nofollow noopener" target="_blank">al-folio</a> 主题。由 <a href="https://pages.github.com/" rel="external nofollow noopener" target="_blank">GitHub Pages</a> 托管。 </div> </footer> <script crossorigin="anonymous" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/bootstrap.bundle.min.js"></script> <script crossorigin="anonymous" integrity="sha256-NdbiivsvWt7VYCt6hYNT3h/th9vSTL4EDWeGs5SN3DA=" src="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/js/mdb.min.js"></script> <script crossorigin="anonymous" defer="" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" src="https://cdn.jsdelivr.net/npm/medium-zoom@1.1.0/dist/medium-zoom.min.js"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/zoom.js?85ddb88934d28b74e78031fd54cf8308"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/no_defer.js?2781658a0a2b13ed609542042a859126"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/common.js?e0514a05c5c95ac1a93a8dfd5249b92e"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/copy_code.js?12775fdf7f95e901d7119054556e495f" type="text/javascript"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/jupyter_new_tab.js?d9f17b6adc2311cbabd747f4538bb15f"></script> <script crossorigin="anonymous" defer="" id="MathJax-script" integrity="sha256-MASABpB4tYktI2Oitl4t+78w/lyA+D7b/s9GEP0JOGI=" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" type="text/javascript"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/mathjax-setup.js?70d799092f862ad98c7876aa47712e20"></script> <script crossorigin="anonymous" defer="" src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/progress-bar.js?2f30e0e6801ea8f5036fa66e1ab0a71a" type="text/javascript"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/vanilla-back-to-top.min.js?f40d453793ff4f64e238e420181a1d17"></script> <script>
+    addBackToTop();
+  </script><div class="hidden" id="back-to-top"><svg viewbox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg></div> <div class="hiddendiv common"></div></body>
+</html>

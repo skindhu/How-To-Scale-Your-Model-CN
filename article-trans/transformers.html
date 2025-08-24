@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+
+<html class="transition" data-theme="light" data-theme-setting="system" lang="zh-CN">
+<head><link href="https://giscus.app/default.css" id="giscus-css" rel="stylesheet"/><style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:20px;margin:11px auto 0;width:20px}#back-to-top.hidden{bottom:-56px;opacity:0}</style> <meta content="text/html; charset=utf-8" http-equiv="Content-Type"/> <meta charset="utf-8"/> <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport"/> <meta content="IE=edge" http-equiv="X-UA-Compatible"/> <title>您需要了解的所有 Transformer 数学知识 | 如何扩展您的模型</title> <meta content=" " name="author"/> <meta content="本文将快速回顾 Transformer 架构，特别是如何计算 FLOPs、字节数以及其他感兴趣的量。" name="description"/> <meta content="scaling, jax, llms, transformers, tpus, google, deepmind, parallelism, pallas" name="keywords"/> <link href="https://jax-ml.github.io/scaling-book/assets/css/bootstrap.min.css?a4b3f509e79c54a512b890d73235ef04" rel="stylesheet"/> <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/css/mdb.min.css" integrity="sha256-jpjYvU3G3N6nrrBwXJoVEYI/0zw8htfFnhT9ljN3JJw=" rel="stylesheet"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/academicons.min.css?f0b7046b84e425c55f3463ac249818f5" rel="stylesheet"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/scholar-icons.css?62b2ac103a88034e6882a5be5f3e2772" rel="stylesheet"/> <link defer="" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Roboto+Slab:100,300,400,500,700|Material+Icons&amp;display=swap" rel="stylesheet" type="text/css"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/jekyll-pygments-themes-vs.css?4ee1a2facd1a8a76347f4bd43a740500" id="highlight_theme_light" media="" rel="stylesheet"/> <link href="https://jax-ml.github.io/scaling-book/assets/img/favicon.png?fddbd8c2ec231ba2060e67c85de32a55" rel="shortcut icon"/> <link href="https://jax-ml.github.io/scaling-book/assets/css/main.css?d41d8cd98f00b204e9800998ecf8427e" rel="stylesheet"/> <link href="transformers.html" rel="canonical"/> <style id="distill-prerendered-styles" type="text/css">/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+html {
+  font-size: 14px;
+	line-height: 1.6em;
+  /* font-family: "Libre Franklin", "Helvetica Neue", sans-serif; */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
+  /*, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";*/
+  text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media(min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: #004276;
+}
+
+figure {
+  margin: 0;
+}
+
+table {
+	border-collapse: collapse;
+	border-spacing: 0;
+}
+
+table th {
+	text-align: left;
+}
+
+table thead {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+table thead th {
+  padding-bottom: 0.5em;
+}
+
+table tbody :first-child td {
+  padding-top: 0.5em;
+}
+
+pre {
+  overflow: auto;
+  max-width: 100%;
+}
+
+p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+sup, sub {
+  vertical-align: baseline;
+  position: relative;
+  top: -0.4em;
+  line-height: 1em;
+}
+
+sub {
+  top: 0.4em;
+}
+
+.kicker,
+.marker {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+
+/* Headline */
+
+@media(min-width: 1024px) {
+  d-title h1 span {
+    display: block;
+  }
+}
+
+/* Figure */
+
+figure {
+  position: relative;
+  margin-bottom: 2.5em;
+  margin-top: 1.5em;
+}
+
+figcaption+figure {
+
+}
+
+figure img {
+  width: 100%;
+}
+
+figure svg text,
+figure svg tspan {
+}
+
+figcaption,
+.figcaption {
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 12px;
+  line-height: 1.5em;
+}
+
+@media(min-width: 1024px) {
+figcaption,
+.figcaption {
+    font-size: 13px;
+  }
+}
+
+figure.external img {
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.1);
+  padding: 18px;
+  box-sizing: border-box;
+}
+
+figcaption a {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+figcaption b,
+figcaption strong, {
+  font-weight: 600;
+  color: rgba(0, 0, 0, 1.0);
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@supports not (display: grid) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    display: block;
+    padding: 8px;
+  }
+}
+
+.base-grid,
+distill-header,
+d-title,
+d-abstract,
+d-article,
+d-appendix,
+distill-appendix,
+d-byline,
+d-footnote-list,
+d-citation-list,
+distill-footer {
+  display: grid;
+  justify-items: stretch;
+  grid-template-columns: [screen-start] 8px [page-start kicker-start text-start gutter-start middle-start] 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr [text-end page-end gutter-end kicker-end middle-end] 8px [screen-end];
+  grid-column-gap: 8px;
+}
+
+.grid {
+  display: grid;
+  grid-column-gap: 8px;
+}
+
+@media(min-width: 768px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start middle-start text-start] 45px 45px 45px 45px 45px 45px 45px 45px [ kicker-end text-end gutter-start] 45px [middle-end] 45px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 16px;
+  }
+
+  .grid {
+    grid-column-gap: 16px;
+  }
+}
+
+@media(min-width: 1000px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start] 50px [middle-start] 50px [text-start kicker-end] 50px 50px 50px 50px 50px 50px 50px 50px [text-end gutter-start] 50px [middle-end] 50px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 16px;
+  }
+
+  .grid {
+    grid-column-gap: 16px;
+  }
+}
+
+@media(min-width: 1180px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start] 60px [middle-start] 60px [text-start kicker-end] 60px 60px 60px 60px 60px 60px 60px 60px [text-end gutter-start] 60px [middle-end] 60px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 32px;
+  }
+
+  .grid {
+    grid-column-gap: 32px;
+  }
+}
+
+
+
+
+.base-grid {
+  grid-column: screen;
+}
+
+/* .l-body,
+d-article > *  {
+  grid-column: text;
+}
+
+.l-page,
+d-title > *,
+d-figure {
+  grid-column: page;
+} */
+
+.l-gutter {
+  grid-column: gutter;
+}
+
+.l-text,
+.l-body {
+  grid-column: text;
+}
+
+.l-page {
+  grid-column: page;
+}
+
+.l-body-outset {
+  grid-column: middle;
+}
+
+.l-page-outset {
+  grid-column: page;
+}
+
+.l-screen {
+  grid-column: screen;
+}
+
+.l-screen-inset {
+  grid-column: screen;
+  padding-left: 16px;
+  padding-left: 16px;
+}
+
+
+/* Aside */
+
+d-article aside {
+  grid-column: gutter;
+  font-size: 12px;
+  line-height: 1.6em;
+  color: rgba(0, 0, 0, 0.6)
+}
+
+@media(min-width: 768px) {
+  aside {
+    grid-column: gutter;
+  }
+
+  .side {
+    grid-column: gutter;
+  }
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-title {
+  padding: 2rem 0 1.5rem;
+  contain: layout style;
+  overflow-x: hidden;
+}
+
+@media(min-width: 768px) {
+  d-title {
+    padding: 4rem 0 1.5rem;
+  }
+}
+
+d-title h1 {
+  grid-column: text;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.1em;
+  margin: 0 0 0.5rem;
+}
+
+@media(min-width: 768px) {
+  d-title h1 {
+    font-size: 50px;
+  }
+}
+
+d-title p {
+  font-weight: 300;
+  font-size: 1.2rem;
+  line-height: 1.55em;
+  grid-column: text;
+}
+
+d-title .status {
+  margin-top: 0px;
+  font-size: 12px;
+  color: #009688;
+  opacity: 0.8;
+  grid-column: kicker;
+}
+
+d-title .status span {
+  line-height: 1;
+  display: inline-block;
+  padding: 6px 0;
+  border-bottom: 1px solid #80cbc4;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-byline {
+  contain: style;
+  overflow: hidden;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  font-size: 0.8rem;
+  line-height: 1.8em;
+  padding: 1.5rem 0;
+  min-height: 1.8em;
+}
+
+
+d-byline .byline {
+  grid-template-columns: 1fr 1fr;
+  grid-column: text;
+}
+
+@media(min-width: 768px) {
+  d-byline .byline {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+  }
+}
+
+d-byline .authors-affiliations {
+  grid-column-end: span 3;
+  grid-template-columns: 1fr 1fr 1fr;
+  margin-bottom: 1em;
+}
+
+@media(min-width: 768px) {
+  d-byline .authors-affiliations {
+    margin-bottom: 0;
+  }
+}
+
+d-byline h3 {
+  font-size: 0.6rem;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.5);
+  margin: 0;
+  text-transform: uppercase;
+}
+
+d-byline p {
+  margin: 0;
+}
+
+d-byline a,
+d-article d-byline a {
+  color: rgba(0, 0, 0, 0.8);
+  text-decoration: none;
+  border-bottom: none;
+}
+
+d-article d-byline a:hover {
+  text-decoration: underline;
+  border-bottom: none;
+}
+
+d-byline p.author {
+  font-weight: 500;
+}
+
+d-byline .affiliations {
+
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-article {
+  contain: layout style;
+ border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding-top: 2rem;
+  color: rgba(0, 0, 0, 0.8);
+}
+
+d-article > * {
+  grid-column: text;
+}
+
+@media(min-width: 768px) {
+  d-article {
+    font-size: 16px;
+  }
+}
+
+@media(min-width: 1024px) {
+  d-article {
+    font-size: 1.06rem;
+    line-height: 1.7em;
+  }
+}
+
+
+/* H2 */
+
+
+d-article .marker {
+  text-decoration: none;
+  border: none;
+  counter-reset: section;
+  grid-column: kicker;
+  line-height: 1.7em;
+}
+
+d-article .marker:hover {
+  border: none;
+}
+
+d-article .marker span {
+  padding: 0 3px 4px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  position: relative;
+  top: 4px;
+}
+
+d-article .marker:hover span {
+  color: rgba(0, 0, 0, 0.7);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.7);
+}
+
+d-article h2 {
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 1.25em;
+  margin: 2rem 0 1.5rem 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  padding-bottom: 1rem;
+}
+
+@media(min-width: 1024px) {
+  d-article h2 {
+    font-size: 36px;
+  }
+}
+
+/* H3 */
+
+d-article h3 {
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.4em;
+  margin-bottom: 1em;
+  margin-top: 2em;
+}
+
+@media(min-width: 1024px) {
+  d-article h3 {
+    font-size: 20px;
+  }
+}
+
+/* H4 */
+
+d-article h4 {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 14px;
+  line-height: 1.4em;
+}
+
+d-article a {
+  color: inherit;
+}
+
+d-article p,
+d-article ul,
+d-article ol,
+d-article blockquote {
+  margin-top: 0;
+  margin-bottom: 1em;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+d-article blockquote {
+  border-left: 2px solid rgba(0, 0, 0, 0.2);
+  padding-left: 2em;
+  font-style: italic;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+d-article a {
+  border-bottom: 1px solid var(--global-underline-color);
+  text-decoration: none;
+}
+
+d-article a:hover {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.8);
+}
+
+d-article .link {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+d-article ul,
+d-article ol {
+  padding-left: 24px;
+}
+
+d-article li {
+  margin-bottom: 1em;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+d-article li:last-child {
+  margin-bottom: 0;
+}
+
+d-article pre {
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+d-article hr {
+  grid-column: screen;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  margin-top: 60px;
+  margin-bottom: 60px;
+}
+
+d-article section {
+  margin-top: 60px;
+  margin-bottom: 60px;
+}
+
+d-article span.equation-mimic {
+  font-family: georgia;
+  font-size: 115%;
+  font-style: italic;
+}
+
+d-article > d-code,
+d-article section > d-code  {
+  display: block;
+}
+
+d-article > d-math[block],
+d-article section > d-math[block]  {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  d-article > d-code,
+  d-article section > d-code,
+  d-article > d-math[block],
+  d-article section > d-math[block] {
+      overflow-x: scroll;
+      -ms-overflow-style: none;  // IE 10+
+      overflow: -moz-scrollbars-none;  // Firefox
+  }
+
+  d-article > d-code::-webkit-scrollbar,
+  d-article section > d-code::-webkit-scrollbar,
+  d-article > d-math[block]::-webkit-scrollbar,
+  d-article section > d-math[block]::-webkit-scrollbar {
+    display: none;  // Safari and Chrome
+  }
+}
+
+d-article .citation {
+  color: #668;
+  cursor: pointer;
+}
+
+d-include {
+  width: auto;
+  display: block;
+}
+
+d-figure {
+  contain: layout style;
+}
+
+/* KaTeX */
+
+.katex, .katex-prerendered {
+  contain: style;
+  display: inline-block;
+}
+
+/* Tables */
+
+d-article table {
+  border-collapse: collapse;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+d-article table th {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+d-article table td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+d-article table tr:last-of-type td {
+  border-bottom: none;
+}
+
+d-article table th,
+d-article table td {
+  font-size: 15px;
+  padding: 2px 8px;
+}
+
+d-article table tbody :first-child td {
+  padding-top: 2px;
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+span.katex-display {
+  text-align: left;
+  padding: 8px 0 8px 0;
+  margin: 0.5em 0 0.5em 1em;
+}
+
+span.katex {
+  -webkit-font-smoothing: antialiased;
+;
+  font-size: 1.18em;
+}
+
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@media print {
+
+  @page {
+    size: 8in 11in;
+    @bottom-right {
+      content: counter(page) " of " counter(pages);
+    }
+  }
+
+  html {
+    /* no general margins -- CSS Grid takes care of those */
+  }
+
+  p, code {
+    page-break-inside: avoid;
+  }
+
+  h2, h3 {
+    page-break-after: avoid;
+  }
+
+  d-header {
+    visibility: hidden;
+  }
+
+  d-footer {
+    display: none!important;
+  }
+
+}
+</style><script src="https://jax-ml.github.io/scaling-book/assets/js/theme.js?9a0c749ec5240d9cda97bc72359a72c0"></script> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/jekyll-pygments-themes-native.css?5847e5ed4a4568527aa6cfab446049ca" id="highlight_theme_dark" media="none" rel="stylesheet"/> <script>
+    initTheme();
+  </script> <script src="https://jax-ml.github.io/scaling-book/assets/js/distillpub/template.v2.js"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/distillpub/transforms.v2.js"></script> <style type="text/css">{{page._styles}}</style> <style type="text/css">/* Chart.js */
+@-webkit-keyframes chartjs-render-animation{from{opacity:0.99}to{opacity:1}}@keyframes chartjs-render-animation{from{opacity:0.99}to{opacity:1}}.chartjs-render-monitor{-webkit-animation:chartjs-render-animation 0.001s;animation:chartjs-render-animation 0.001s;}</style><style type="text/css">.medium-zoom-overlay{position:fixed;top:0;right:0;bottom:0;left:0;opacity:0;transition:opacity .3s;will-change:opacity}.medium-zoom--opened .medium-zoom-overlay{cursor:pointer;cursor:zoom-out;opacity:1}.medium-zoom-image{cursor:pointer;cursor:zoom-in;transition:transform .3s cubic-bezier(.2,0,.2,1)!important}.medium-zoom-image--hidden{visibility:hidden}.medium-zoom-image--opened{position:relative;cursor:pointer;cursor:zoom-out;will-change:transform}</style><style type="text/css">.CtxtMenu_InfoClose {  top:.2em; right:.2em;}
+.CtxtMenu_InfoContent {  overflow:auto; text-align:left; font-size:80%;  padding:.4em .6em; border:1px inset; margin:1em 0px;  max-height:20em; max-width:30em; background-color:#EEEEEE;  white-space:normal;}
+.CtxtMenu_Info.CtxtMenu_MousePost {outline:none;}
+.CtxtMenu_Info {  position:fixed; left:50%; width:auto; text-align:center;  border:3px outset; padding:1em 2em; background-color:#DDDDDD;  color:black;  cursor:default; font-family:message-box; font-size:120%;  font-style:normal; text-indent:0; text-transform:none;  line-height:normal; letter-spacing:normal; word-spacing:normal;  word-wrap:normal; white-space:nowrap; float:none; z-index:201;  border-radius: 15px;                     /* Opera 10.5 and IE9 */  -webkit-border-radius:15px;               /* Safari and Chrome */  -moz-border-radius:15px;                  /* Firefox */  -khtml-border-radius:15px;                /* Konqueror */  box-shadow:0px 10px 20px #808080;         /* Opera 10.5 and IE9 */  -webkit-box-shadow:0px 10px 20px #808080; /* Safari 3 & Chrome */  -moz-box-shadow:0px 10px 20px #808080;    /* Forefox 3.5 */  -khtml-box-shadow:0px 10px 20px #808080;  /* Konqueror */  filter:progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color="gray", Positive="true"); /* IE */}
+</style><style type="text/css">.CtxtMenu_MenuClose {  position:absolute;  cursor:pointer;  display:inline-block;  border:2px solid #AAA;  border-radius:18px;  -webkit-border-radius: 18px;             /* Safari and Chrome */  -moz-border-radius: 18px;                /* Firefox */  -khtml-border-radius: 18px;              /* Konqueror */  font-family: "Courier New", Courier;  font-size:24px;  color:#F0F0F0}
+.CtxtMenu_MenuClose span {  display:block; background-color:#AAA; border:1.5px solid;  border-radius:18px;  -webkit-border-radius: 18px;             /* Safari and Chrome */  -moz-border-radius: 18px;                /* Firefox */  -khtml-border-radius: 18px;              /* Konqueror */  line-height:0;  padding:8px 0 6px     /* may need to be browser-specific */}
+.CtxtMenu_MenuClose:hover {  color:white!important;  border:2px solid #CCC!important}
+.CtxtMenu_MenuClose:hover span {  background-color:#CCC!important}
+.CtxtMenu_MenuClose:hover:focus {  outline:none}
+</style><style type="text/css">.CtxtMenu_Menu {  position:absolute;  background-color:white;  color:black;  width:auto; padding:5px 0px;  border:1px solid #CCCCCC; margin:0; cursor:default;  font: menu; text-align:left; text-indent:0; text-transform:none;  line-height:normal; letter-spacing:normal; word-spacing:normal;  word-wrap:normal; white-space:nowrap; float:none; z-index:201;  border-radius: 5px;                     /* Opera 10.5 and IE9 */  -webkit-border-radius: 5px;             /* Safari and Chrome */  -moz-border-radius: 5px;                /* Firefox */  -khtml-border-radius: 5px;              /* Konqueror */  box-shadow:0px 10px 20px #808080;         /* Opera 10.5 and IE9 */  -webkit-box-shadow:0px 10px 20px #808080; /* Safari 3 & Chrome */  -moz-box-shadow:0px 10px 20px #808080;    /* Forefox 3.5 */  -khtml-box-shadow:0px 10px 20px #808080;  /* Konqueror */}
+.CtxtMenu_MenuItem {  padding: 1px 2em;  background:transparent;}
+.CtxtMenu_MenuArrow {  position:absolute; right:.5em; padding-top:.25em; color:#666666;  font-family: null; font-size: .75em}
+.CtxtMenu_MenuActive .CtxtMenu_MenuArrow {color:white}
+.CtxtMenu_MenuArrow.CtxtMenu_RTL {left:.5em; right:auto}
+.CtxtMenu_MenuCheck {  position:absolute; left:.7em;  font-family: null}
+.CtxtMenu_MenuCheck.CtxtMenu_RTL { right:.7em; left:auto }
+.CtxtMenu_MenuRadioCheck {  position:absolute; left: .7em;}
+.CtxtMenu_MenuRadioCheck.CtxtMenu_RTL {  right: .7em; left:auto}
+.CtxtMenu_MenuInputBox {  padding-left: 1em; right:.5em; color:#666666;  font-family: null;}
+.CtxtMenu_MenuInputBox.CtxtMenu_RTL {  left: .1em;}
+.CtxtMenu_MenuComboBox {  left:.1em; padding-bottom:.5em;}
+.CtxtMenu_MenuSlider {  left: .1em;}
+.CtxtMenu_SliderValue {  position:absolute; right:.1em; padding-top:.25em; color:#333333;  font-size: .75em}
+.CtxtMenu_SliderBar {  outline: none; background: #d3d3d3}
+.CtxtMenu_MenuLabel {  padding: 1px 2em 3px 1.33em;  font-style:italic}
+.CtxtMenu_MenuRule {  border-top: 1px solid #DDDDDD;  margin: 4px 3px;}
+.CtxtMenu_MenuDisabled {  color:GrayText}
+.CtxtMenu_MenuActive {  background-color: #606872;  color: white;}
+.CtxtMenu_MenuDisabled:focus {  background-color: #E8E8E8}
+.CtxtMenu_MenuLabel:focus {  background-color: #E8E8E8}
+.CtxtMenu_ContextMenu:focus {  outline:none}
+.CtxtMenu_ContextMenu .CtxtMenu_MenuItem:focus {  outline:none}
+.CtxtMenu_SelectionMenu {  position:relative; float:left;  border-bottom: none; -webkit-box-shadow:none; -webkit-border-radius:0px; }
+.CtxtMenu_SelectionItem {  padding-right: 1em;}
+.CtxtMenu_Selection {  right: 40%; width:50%; }
+.CtxtMenu_SelectionBox {  padding: 0em; max-height:20em; max-width: none;  background-color:#FFFFFF;}
+.CtxtMenu_SelectionDivider {  clear: both; border-top: 2px solid #000000;}
+.CtxtMenu_Menu .CtxtMenu_MenuClose {  top:-10px; left:-10px}
+</style><script charset="UTF-8" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/input/tex/extensions/color.js"></script><link crossorigin="anonymous" href="https://distill.pub/third-party/katex/katex.min.css" rel="stylesheet"/><script async="" src="https://distill.pub/third-party/katex/katex.min.js"></script></head>
+<body> <d-front-matter> <script async="" type="text/json">
+      {
+            "title": "你需要知道的所有Transformer数学知识",
+            "description": "在这里，我们将快速回顾Transformer架构，特别是如何计算FLOPs、字节数和其他感兴趣的量。",
+            "published": "February 04, 2025",
+            "authors": [
+              
+              {
+                "author": "Jacob Austin",
+                "authorURL": "https://www.jacobaustin.org/",
+                "affiliations": [
+                  {
+                    "name": "Google DeepMind",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Sholto Douglas",
+                "authorURL": "https://x.com/_sholtodouglas",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Roy Frostig",
+                "authorURL": "https://cs.stanford.edu/~rfrostig/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Anselm Levskaya",
+                "authorURL": "https://anselmlevskaya.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Charlie Chen",
+                "authorURL": "https://x.com/charliexychen",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Sharad Vikram",
+                "authorURL": "https://sharadvikram.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Federico Lebron",
+                "authorURL": "https://fedelebron.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Peter Choy",
+                "authorURL": "https://x.com/pchoy95",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Vinay Ramasesh",
+                "authorURL": "https://x.com/vinayramasesh",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Albert Webson",
+                "authorURL": "https://representation.ai/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Reiner Pope<sup>*</sup>",
+                "authorURL": "https://x.com/reinerpope",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              }
+              
+            ],
+            "katex": {
+              "delimiters": [
+                {
+                  "left": "$",
+                  "right": "$",
+                  "display": false
+                },
+                {
+                  "left": "$$",
+                  "right": "$$",
+                  "display": true
+                }
+              ]
+            }
+          }
+    </script> </d-front-matter> <header> <script>
+    function goToTop() {
+      document.body.scrollTop = 0; // For Safari
+      document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+    }
+
+    // When the user scrolls down 20px from the top of the document, show the button
+    window.onscroll = function() {scrollFunction()};
+
+    function scrollFunction() {
+      // Get the button:
+      let mybutton = document.getElementById("top-button");
+
+      if (document.body.scrollTop > 40 || document.documentElement.scrollTop > 40) {
+        mybutton.style.display = "block";
+      } else {
+        mybutton.style.display = "none";
+      }
+  }
+  </script> <nav class="navbar navbar-light navbar-expand-sm fixed-top" id="navbar" role="navigation"> <div class="container"> <a class="navbar-brand title font-weight-lighter" href="scaling-book.html"> 如何扩展你的模型 </a> <button aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler collapsed ml-auto" data-target="#navbarNav" data-toggle="collapse" type="button"> <span class="sr-only">切换导航</span> <span class="icon-bar top-bar"></span> <span class="icon-bar middle-bar"></span> <span class="icon-bar bottom-bar"></span> </button> <div class="left-button section-button"><a href="sharding.html"><svg viewbox="-78.5 0 512 512"><path d="M257 64L291 98 128 262 291 426 257 460 61 262 257 64Z"></path></svg></a></div> <div class="right-button section-button"><a href="training.html"><svg viewbox="-78.5 0 512 512"><path d="M98 460L64 426 227 262 64 98 98 64 294 262 98 460Z"></path></svg></a></div> <div class="collapse navbar-collapse text-right" id="navbarNav"> <ul class="navbar-nav ml-auto flex-nowrap"> <li class="nav-item"> <a class="nav-link" href="scaling-book.html"> </a> </li> <li class="nav-item nav-hidden"><a class="nav-link" id="top-button" onclick="goToTop()" style="display: none;">返回顶部</a></li> <li class="nav-item nav-hidden"><p class="nav-link"></p></li> <li class="nav-item nav-hidden"><a class="nav-link" href="sharding.html">上一部分</a></li> <li class="nav-item nav-hidden"><a class="nav-link" href="training.html">下一部分</a></li> <li class="nav-item nav-hidden"><p class="nav-link"></p></li> <li class="nav-item dropdown"> <a aria-expanded="false" aria-haspopup="true" class="nav-link dropdown-toggle" data-toggle="dropdown" href="#" id="navbarDropdown" role="button">章节 </a> <div aria-labelledby="navbarDropdown" class="dropdown-menu dropdown-menu-right"> <a class="dropdown-item" href="https://jax-ml.github.io/scaling-book/index">第0部分：引言</a> <a class="dropdown-item" href="roofline.html">第1部分：屋顶线模型简介</a> <a class="dropdown-item" href="tpus.html">第2部分：关于TPU的一切</a> <a class="dropdown-item" href="sharding.html">第3部分：分片矩阵乘法</a> <a class="dropdown-item" href="transformers.html">第4部分：Transformer</a> <a class="dropdown-item" href="training.html">第5部分：训练</a> <a class="dropdown-item" href="applied-training.html">第6部分：训练LLaMA</a> <a class="dropdown-item" href="inference.html">第7部分：推理</a> <a class="dropdown-item" href="applied-inference.html">第8部分：服务LLaMA</a> <a class="dropdown-item" href="profiling.html">第9部分：性能分析</a> <a class="dropdown-item" href="jax-stuff.html">第10部分：关于JAX的一切</a> <a class="dropdown-item" href="conclusion.html">第11部分：结论</a> <a class="dropdown-item" href="gpus.html">第12部分：GPU</a> </div> </li> <li class="toggle-container"> <button id="light-toggle" title="Change theme"> <i class="ti ti-sun-moon" id="light-toggle-system"></i> <i class="ti ti-moon-filled" id="light-toggle-dark"></i> <i class="ti ti-sun-filled" id="light-toggle-light"></i> </button> </li> </ul> </div> </div> </nav> <progress id="progress" value="0"> <div class="progress-container"> <span class="progress-bar"></span> </div> </progress> </header> <div class="post distill"><div class="translation-info base-grid" style="margin-bottom: 20px;">
+<div style="grid-column: text;
+                       display: flex;
+                       align-items: center;
+                       justify-content: space-between;
+                       padding: 16px 0;
+                       border-bottom: 1px solid var(--global-text-color-light, rgba(0,0,0,0.15));
+                       font-size: 16px;
+                       line-height: 1.5;
+                       color: var(--global-text-color, currentColor);">
+<div style="display: flex;
+                           flex-direction: column;
+                           gap: 8px;">
+<div>
+<span style="font-weight: 600; color: var(--global-text-color, currentColor);">🔗 英文原文：</span>
+<a href="https://jax-ml.github.io/scaling-book/transformers/" onmouseout="this.style.textDecoration='none'" onmouseover="this.style.textDecoration='underline'" rel="noopener noreferrer" style="color: var(--global-theme-color, #004276);
+                                  text-decoration: none;
+                                  margin-left: 4px;" target="_blank">
+                           https://jax-ml.github.io/scaling-book/transformers/
+                        </a>
+</div>
+<div>
+<span style="font-weight: 600; color: var(--global-text-color, currentColor);">✍️ 翻译：</span>
+<span style="margin-left: 4px; color: var(--global-text-color, currentColor);">北极的树</span>
+</div>
+</div>
+<div style="flex-shrink: 0;
+                           display: flex;
+                           flex-direction: column;
+                           align-items: center;
+                           gap: 6px;
+                           margin-left: 20px;">
+<img alt="微信二维码" loading="lazy" src="https://wechat-account-1251781786.cos.ap-guangzhou.myqcloud.com/wechat_account.jpeg" style="width: 80px;
+                                height: 80px;
+                                border-radius: 6px;
+                                opacity: 0.9;"/>
+<span style="font-size: 12px;
+                                 color: var(--global-text-color-light, currentColor);
+                                 opacity: 0.8;
+                                 text-align: center;">
+                        微信公众号
+                    </span>
+</div>
+</div>
+</div> <d-title> <h1>你需要知道的所有Transformer数学知识</h1> <p>《如何扩展你的模型》第4部分 (<a href="sharding.html">第3部分：分片</a> | <a href="training.html">第5部分：训练</a>)</p> <p>在这里，我们将快速回顾Transformer架构，特别是如何计算FLOPs、字节数和其他感兴趣的量。</p> </d-title> <d-byline>
+<div class="byline grid">
+<div class="authors-affiliations grid">
+<h3 style="grid-column: 1; grid-row: 1;">作者</h3>
+<h3></h3>
+<h3>单位</h3>
+<p class="author" style="grid-column: 1; grid-row: 2;">
+<a class="name" href="https://www.jacobaustin.org/">Jacob Austin</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 2;">
+<span class="affiliation">Google DeepMind</span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 3;">
+<a class="name" href="https://x.com/_sholtodouglas">Sholto Douglas</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 3;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 4;">
+<a class="name" href="https://cs.stanford.edu/~rfrostig/">Roy Frostig</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 4;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 5;">
+<a class="name" href="https://anselmlevskaya.com/">Anselm Levskaya</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 5;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 6;">
+<a class="name" href="https://x.com/charliexychen">Charlie Chen</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 6;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 7;">
+<a class="name" href="https://sharadvikram.com/">Sharad Vikram</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 7;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 2;">
+<a class="name" href="https://fedelebron.com/">Federico Lebron</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 2;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 3;">
+<a class="name" href="https://x.com/pchoy95">Peter Choy</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 3;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 4;">
+<a class="name" href="https://x.com/vinayramasesh">Vinay Ramasesh</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 4;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 5;">
+<a class="name" href="https://representation.ai/">Albert Webson</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 5;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 6;">
+<a class="name" href="https://x.com/reinerpope">Reiner Pope<sup>*</sup></a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 6;">
+<span class="affiliation"></span>
+</p>
+</div>
+<div>
+<h3>发布日期</h3>
+<p>2025年2月4日</p>
+</div>
+</div>
+</d-byline> <d-article> <d-contents> <nav class="l-text figcaption"> <h3>目录</h3> <div> <a href="#counting-dots">点积计算</a> </div> <div> <a href="#"></a> </div> <ul> <li> <a href="#forward-and-reverse-flops">前向和反向FLOPs</a> </li> </ul> <div> <a href="#transformer-accounting">Transformer计算分析</a> </div> <div> <a href="#global-flops-and-params-calculation">全局FLOPs和参数计算</a> </div> <div> <a href="#miscellaneous-math">其他数学知识</a> </div> <div> <a href="#"></a> </div> <ul> <li> <a href="#sparsity-and-mixture-of-experts">稀疏性与专家混合模型</a> </li> <li> <a href="#gradient-checkpointing">梯度检查点</a> </li> <li> <a href="#key-value-kv-caching">键值（KV）缓存</a> </li> </ul> <div> <a href="#what-should-you-take-away-from-this-section">本节要点总结</a> </div> <div> <a href="#a-few-problems-to-work">几个练习题</a> </div> <div> <a href="#appendix">附录</a> </div> <div> <a href="#"></a> </div> <ul> <li> <a href="#appendix-a-how-does-flash-attention-work">附录A：Flash Attention是如何工作的？</a> </li> </ul> </nav> </d-contents> <h2 id="counting-dots">点积计算</h2> <p>让我们从向量\(x\)、\(y\)和矩阵\(A\)、\(B\)开始，它们的形状如下：</p><span> \[\def \red#1{\textcolor{red}{#1}} \def \green#1{\textcolor{green}{#1}} \def \blue#1{\textcolor{blue}{#1}} \def \purple#1{\textcolor{purple}{#1}} \def \orange#1{\textcolor{orange}{#1}} \def \gray#1{\textcolor{gray}{#1}} \begin{array}{cc} \textrm{数组} &amp; \textrm{形状} \\ \hline x &amp; \textrm{[P]} \\ y &amp; \textrm{[P]} \\ A &amp; \textrm{[N P]} \\ B &amp; \textrm{[P M]} \\ \hline \end {array}\] </span><ul> <li>\(x \cdot y\)的点积需要\(P\)次<em>加法</em>和<em>乘法</em>，总共\(2P\)次浮点运算。</li> <li>矩阵向量积\(Ax\)沿\(A\)的行进行\(N\)次点积，共\(2NP\) FLOPs。</li> <li>矩阵-矩阵积\(AB\)对\(B\)的\(M\)列中的每一列进行一次矩阵向量积，总共\(2NPM\) FLOPs。</li> <li>通常，如果我们有两个更高维的数组\(C\)和\(D\)，其中一些维度是<span style="color:red">收缩（CONTRACTING）</span>维度，一些是<span style="color:blue">批处理（BATCHING）</span>维度。（例如 \(C[\blue{GH}IJ\red{KL}], D[\blue{GH}MN\red{KL}]\)），那么这次收缩的FLOPs成本是所有\(C\)和\(D\)维度乘积的两倍，其中批处理和收缩维度只计算一次，（例如 \(2\blue{GH}IJMN\red{KL}\)）。请注意，一个维度只有在两个乘数中都出现时才是批处理维度。（另请注意，如果没有收缩维度，这只是一个逐元素乘积，则2的因子不适用。）</li> </ul><span> \[\begin{array}{ccc} \textrm{操作} &amp; \textrm{FLOPs} &amp; \textrm{数据} \\ \hline x \cdot y &amp; 2P &amp; 2P \\ A x &amp; 2NP &amp; NP + P \\ AB &amp; 2NPM &amp; NP + PM \\ [c_0,...,c_N] \cdot [d_0,...,d_N] &amp; 2 \prod c_i \times \prod_{\substack{d_j \notin \blue{BATCH} \\ d_j \notin \red{CONTRACT}}} d_j &amp; \prod c_i + \prod d_j \\ \hline \end {array}\] </span><p>请注意，对于矩阵-矩阵乘法，<em>计算量</em>以立方级（\(O(N^3)\)）增长，而数据传输仅以平方级（\(O(N^2)\)）增长——这意味着随着我们扩大矩阵乘法的规模，达到计算饱和的极限变得<em>更容易</em>。这是极不寻常的，并且在很大程度上解释了为什么我们使用以矩阵乘法为主的架构——它们易于扩展！</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/matmul-flops-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/matmul-flops-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/matmul-flops-1400.webp 1400w" type="image/webp"/> <img class="img-fluid" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/matmul-flops.gif" width="100%"/> </picture> </figure> <h3 id="forward-and-reverse-flops">前向和反向FLOPs</h3> <p>在训练期间，我们并不特别关心给定矩阵乘法的结果；我们真正关心的是它的导数。这意味着我们在反向传播期间会进行更多的FLOPs。</p> <p>如果我们假设<strong>B</strong>只是一个更大网络中的一个矩阵，而<strong>A</strong>是我们的输入激活，其中<strong>C = A B</strong>，则损失<strong>L</strong>相对于<strong>B</strong>的导数由链式法则给出：</p><span> \[\frac{\partial L}{\partial B} = \frac{\partial L}{\partial C}\frac{\partial C}{\partial B} = A^T \left(\frac{\partial L}{\partial C}\right)\] </span><p>这是一个外积，需要<d-math>2NPM</d-math> FLOPs来计算（因为它在\(N\)维度上收缩）。同样，损失相对于<strong>A</strong>的导数为</p><span> \[\frac{\partial L}{\partial A} = \frac{\partial L}{\partial C}\frac{\partial C}{\partial A} = \left(\frac{\partial L}{\partial C}\right) B^T\] </span><p>同样是<d-math>2NPM</d-math> FLOPs，因为<strong>dL/dC</strong>是一个大小为\[N, M\]的（余）向量。虽然这个量不是相对于参数的导数，但它被用来计算网络前几层的导数（例如，就像dL/dC被用来计算上面的dL/dB一样）。</p> <p>将这些加起来，我们看到<strong>在训练期间，我们总共有6NPM FLOPs</strong>，而在推理期间是2NPM：前向传播2NPM，反向传播4NPM。由于PM是矩阵中的参数数量，这是著名的\(6 * \text{参数数量} * \text{token数量}\)近似Transformer训练期间FLOPs的最简单形式：每个token需要\(6 * \text{参数数量}\) FLOPs。我们将在下面展示一个更正确的推导。</p> <h2 id="transformer-accounting">Transformer计算分析</h2> <p>Transformer是未来。嗯，至少它们是现在。也许几年前，它们是众多架构之一。但今天，几乎值得了解该架构的每一个细节。我们不会重新介绍该架构，但<a href="https://jalammar.github.io/illustrated-transformer/" rel="external nofollow noopener" target="_blank">这篇博客</a>和<a href="https://arxiv.org/abs/1706.03762" rel="external nofollow noopener" target="_blank">原始Transformer论文</a>可能会是很有帮助的参考资料。</p> <p>以下是Transformer解码器架构的基本示意图：</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/transformer-diagram-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/transformer-diagram-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/transformer-diagram-1400.webp 1400w" type="image/webp"/> <img class="img-fluid" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/transformer-diagram.png" width="100%"/> </picture> <figcaption class="caption"><b>图：</b>该图展示了一个标准Transformer的一层，数据流从上到下。我们使用单字母约定来描述Transformer中数组的形状和布局，再次用红色表示收缩维度，用蓝色表示批处理维度。在给定的操作中，左上角是输入形状，右上角是参数形状，下方是结果形状，例如，BTD是门控einsum的输入形状，DF是权重形状。</figcaption> </figure> <p><strong>注意 [门控einsum]</strong>：上图使用了一种“<a href="https://arxiv.org/abs/2002.05202" rel="external nofollow noopener" target="_blank">门控einsum</a>”<d-cite key="glu"></d-cite>，其中我们将上投影矩阵分成两个矩阵（上图中的\(W_\text{In1}\)和\(W_\text{In2}\)），其输出被逐元素相乘以作为一种“门控函数”。并非所有LLM都使用这种方法，所以你有时会看到一个单独的\(W_\text{In}\)矩阵，总MLP参数数量为2DF而不是3DF。通常在这种情况下，D和F会被放大以保持参数数量与3矩阵情况相同。话虽如此，LLAMA、DeepSeek和许多其他模型都使用了某种形式的门控einsum。</p> <p><strong>注意2 [MHA注意力]</strong>：对于自注意力，T和S是相同的，但对于交叉注意力，它们可能不同。对于普通的多头注意力（MHA），N和K是相同的，而对于<a href="https://arxiv.org/abs/1911.02150" rel="external nofollow noopener" target="_blank">多查询注意力</a>（MQA）<d-cite key="mqa"></d-cite>，K=1，对于<a href="https://arxiv.org/abs/2305.13245" rel="external nofollow noopener" target="_blank">分组MQA</a>（GMQA）<d-cite key="gmqa"></d-cite>，K只需能整除N即可。</p> <h2 id="global-flops-and-params-calculation">全局FLOPs和参数计算</h2> <p>为了避免到处都写上<strong>L</strong>因子，下面我们将计算每层的FLOPs。</p> <h3 id="mlps">MLP</h3> <p>Transformer的MLP通常由2个输入矩阵乘法（其结果逐元素组合）和1个输出矩阵乘法组成：</p><span> \[\begin{array}{ccc} \textrm{操作} &amp; \textrm{训练 FLOPs} &amp; \textrm{参数} \\ \hline \\ A[B,T,\red{D}] \cdot W_{in1}[\red{D}, F] &amp; 6BTDF &amp; DF \\[10pt] A[B,T,\red{D}] \cdot W_{in2}[\red{D}, F] &amp; 6BTDF &amp; DF \\[10pt] \sigma\left(A_{in1}\right)[B,T, F] * A_{in2}[B,T, F] &amp; \gray{O(BTF)} \\[10pt] A[B,T,\red{F}] \cdot W_{out}[\red{F}, D] &amp; 6BTDF &amp; DF \\[10pt] \hline \\ &amp; \approx 18BTDF &amp; 3DF \end{array}\] </span><h3 id="attention">注意力</h3> <p>对于具有不同<strong>Q</strong>和<strong>KV</strong>头数的通用分组查询注意力情况，我们假设<strong>Q</strong>、<strong>K</strong>、<strong>V</strong>投影的头维度H相等，并估计<strong>QKVO</strong>矩阵乘法的成本：</p><span> \[\begin{array}{ccc} \textrm{操作} &amp; \textrm{训练 FLOPs} &amp; \textrm{参数} \\ \hline \\ A[B,T,\red{D}] \cdot W_{Q}[\red{D}, N, H] &amp; 6BTDNH &amp; DNH \\[10pt] A[B,T,\red{D}] \cdot W_{K}[\red{D}, K, H] &amp; 6BTDKH &amp; DKH \\[10pt] A[B,T,\red{D}] \cdot W_{V}[\red{D}, K, H] &amp; 6BTDKH &amp; DKH \\[10pt] A[B,T,\red{N}, \red{H}] \cdot W_{O}[\red{N}, \red{H}, D] &amp; 6BTDNH &amp; DNH \\[10pt] \hline \\ &amp; 12BTD(N+K)H &amp; 2D(N+K)H \end{array}\] </span><p>点积注意力操作更为精细，实际上是在\(B\)、\(K\)维度上批处理的\(TH \cdot HS\)矩阵乘法，一个softmax，以及再次在\(B\)、\(K\)维度上批处理的\(TS \cdot SH\)矩阵乘法。我们用蓝色突出显示批处理维度：</p><span> \[\begin{array}{cc} \textrm{操作} &amp; \textrm{训练 FLOPs} \\ \hline \\[3pt] Q[\blue{B}, T, \blue{K}, G, \red{H}] \cdot K[\blue{B}, S, \blue{K}, \red{H}] &amp; 6BTSKGH = 6BTSNH \\[3pt] \textrm{softmax}_S \;\; L[B, T, S, K, G] &amp; \gray{O(BTSKG) = O(BTSN)} \\[3pt] S[\blue{B}, T, \red{S}, \blue{K}, G] \cdot V[\blue{B}, \red{S}, \blue{K}, H] &amp; 6BTSKGH = 6BTSNH \\[3pt] \hline \\ &amp; \approx 12BTSNH = 12BT^2NH \\ \end{array}\] </span><h3 id="other-operations">其他操作</h3> <p>在Transformer中还有其他几种操作。层归一化（Layernorm）相对便宜，在一阶成本估算中可以忽略。还有一个最终的巨大（但不是每层都有）的unembedding矩阵乘法。</p><span> \[\begin{array}{ccc} \textsf{操作} &amp; \textsf{训练 FLOPs} &amp; \textsf{参数} \\ \hline \\ \textrm{layernorm}_D \;\; A[B,T,\red{D}] &amp; \gray{O\left(BTD\right)} &amp; \gray{D} \\[10pt] A[B,T,\red{D}] \cdot W_{unembed}[\red{D}, V] &amp; 6BTDV &amp; DV \\ \end{array}\] </span><h3 id="general-rule-of-thumb-for-transformer-flops">Transformer FLOPs的通用经验法则</h3> <p>如果我们忽略短上下文训练中点积注意力的成本，那么所有层的总FLOPs为</p><span> \[\begin{align*} (18BTDF + 12BTD(N+K)H)L = 6 *BT * (3DF + 2D(N+K)H)L \\ = 6 * \textrm{token数量} * \textrm{参数数量} \end{align*}\] </span><p>这就得出了一个著名的经验法则，用于估算密集Transformer的FLOPs数量，忽略了注意力的FLOPs。（Unembedding是另一个简单的矩阵乘法，有<d-math>6BSDV</d-math> FLOPs和<d-math>DV</d-math>参数，遵循相同的经验法则。）</p> <h3 id="fractional-cost-of-attention-with-context-length">注意力成本在上下文长度中的占比</h3> <p>如果我们确实考虑了上面的点积注意力，并假设\(F=4D\)，\(D=NH\)（通常如此）和\(N=K\)：</p><span> \[\small{\frac{\textrm{注意力 FLOPs}}{\textrm{矩阵乘法 FLOPs}} = \frac{12BT^2NH}{18BTDF + 24BTDNH} = \frac{12BT^2D}{4*18 BTD^2 + 24 BTD^2} = \frac{12BT^2D}{96 BTD^2} = \frac{T}{8D}}\] </span><p>因此，结论是<strong>点积注意力的FLOPs仅在训练期间T&gt;8D时才占主导地位</strong>。对于D约等于8k，这将是约64K个token。这在某种程度上是合理的，因为它意味着随着MLP大小的增加，注意力的FLOPs变得不那么关键。对于大型模型，注意力的二次成本实际上并不是长上下文训练的巨大障碍。然而，对于较小的模型，例如Gemma-27B，D=4608，这意味着注意力在序列长度约32k时开始占主导地位。Flash Attention也有助于减轻长上下文的成本，我们将在<a href="#appendix-a-how-does-flash-attention-work">附录A</a>中简要讨论。</p> <h2 id="miscellaneous-math">其他数学知识</h2> <h3 id="sparsity-and-mixture-of-experts">稀疏性与专家混合模型</h3> <p>我们不能不简要讨论一下专家混合（MoE）模型<d-cite key="moe"></d-cite>，它用一组可以动态路由的独立MLP替换了标准Transformer中的单个密集MLP块。初步近似，<strong>一个MoE模型就是一个每层有E个MLP块的普通密集模型</strong>，而不是只有一个。每个token激活其中\(k\)个专家，通常\(k=2\)。与密集版本相比，这将参数数量增加了\(O(E)\)倍，同时将每个token激活的总参数数量乘以\(k\)倍。</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/moe-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/moe-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/moe-1400.webp 1400w" type="image/webp"/> <img class="img-fluid img-small" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/moe.png" width="100%"/> </picture> <figcaption class="caption"><b>图：</b>一个有\(n\)个专家的MoE层示例。门控专家将每个token路由到其中的\(k\)个，这\(k\)个MLP的输出被求和。我们的参数数量是每个专家大小的\(n\)倍，但每个token只使用\(k\)个。<a href="https://deepgram.com/learn/mixture-of-experts-ml-model-guide" rel="external nofollow noopener" target="_blank">来源</a>。</figcaption> </figure> <p>与密集模型相比，MoE引入了新的通信，主要是两个AllToAll操作（一个在MoE块之前，一个在之后），用于将token路由到正确的专家，并将它们带回其宿主设备。<d-footnote id="d-footnote-1">严格来说，这只在我们沿专家所在的同一轴进行数据或序列分片时才会发生。</d-footnote>然而，正如我们在上一节中看到的，每个AllToAll的成本仅为沿单个轴（对于双向环）的可比AllGather成本的1/4。</p> <h3 id="gradient-checkpointing">梯度检查点</h3> <p>反向传播作为一种算法，是用内存换取计算。反向传播不再需要\(O(n_\text{layers}^2)\)的FLOPs，而是<strong>需要\(O(n_\text{layers})\)的内存</strong>，保存前向传播期间生成的所有中间激活。虽然这比二次计算要好，但在内存方面却非常昂贵：一个拥有\(B * T=4M\)（每批次总共4M个token）、L=64和D=8192的模型，如果避免所有不必要的反向传播计算，将不得不以bfloat16格式保存大约\(2 * 20 * B * T * D * L = 84TB\)的激活。这里的20（大致）来自于计算上图Transformer图中的每个中间节点，因为例如</p><span> \[f(x) = \exp(g(x))\] \[\frac{df}{dx} = \exp(g(x)) \cdot \frac{dg}{dx}\] </span><p>因此为了避免重新计算，我们需要保存前向传播中的\(g(x)\)和\(\exp(g(x))\)。为了避免保存这么多内存，我们可以选择只保存一部分中间激活。以下是我们使用的几种策略。</p> <ul> <li> <strong>块重计算（Block remat）</strong>：只保存每层的输入。这是我们使用的最激进的方法，每层只保存1个检查点，这意味着在上面的例子中我们只保存4.2TB。这迫使我们在反向传播中重复几乎所有的前向传播FLOPs，意味着我们将FLOPs从\(6ND\)增加到大约\(8ND\)。</li> <li> <strong>仅限大矩阵乘法：</strong> 另一个简单的策略是只保存大矩阵乘法的输出。这使我们避免在反向传播期间重新计算任何大的矩阵乘法，但仍然需要我们重新计算其他激活函数和注意力的部分。这将每层的20个节点减少到接近每层7个。</li> </ul> <p>这绝不是全面的。在使用JAX时，这些通常由<code class="language-plaintext highlighter-rouge">jax.remat</code>/<code class="language-plaintext highlighter-rouge">jax.checkpoint</code>控制（你可以在<a href="https://jax.readthedocs.io/en/latest/_autosummary/jax.checkpoint.html" rel="external nofollow noopener" target="_blank">这里</a>阅读更多）。</p> <h3 id="key-value-kv-caching">键值（KV）缓存</h3> <p>正如我们将在<a href="inference.html">第7节</a>中看到的，LLM推理有两个关键部分，预填充（prefill）和生成（generation）。</p> <ul> <li> <strong>预填充（Prefill）</strong> 处理一个长提示，并将其注意力激活保存在键值缓存（KV Cache）中，以供生成时使用，特别是在注意力块中的键值投影。</li> <li> <strong>生成（Generation）</strong> 将多个这样的KV缓存批处理在一起，并从每个缓存中采样token。</li> </ul> <p>每个KV缓存实际上是一个大小为<d-math>[2, S, L, K, H]</d-math>的数组，其中2代表键和值。这相当大！以int8格式存储的键值缓存总大小为<d-math>2SLKH</d-math>。对于一个中等规模的模型，上下文长度为8k，有64层，且<d-math>KH = NH = D = 8192</d-math>，这将是<d-math>2 \cdot 8192 \cdot 64 \cdot 8192 = 8\text{GiB}</d-math>。你可以看到为什么我们想要使用GMQA，其中<d-math>K \ll N</d-math>。</p> <h2 id="what-should-you-take-away-from-this-section">本节要点总结</h2> <ul> <li>Transformer的总体参数和FLOPs相当容易计算，总结如下，假设为MHA（批大小为B，词汇表大小为V，序列长度为T，D=d<sub>model</sub>，F=d<sub>ff</sub>）：</li> </ul> <table class="table-hover" data-toggle="table"> <thead> <tr> <th style="text-align: left">组件</th> <th style="text-align: left">每层参数</th> <th style="text-align: left">每层训练FLOPs</th> </tr> </thead> <tbody> <tr> <td style="text-align: left"><strong>MLP</strong></td> <td style="text-align: left">3DF</td> <td style="text-align: left">18BTDF</td> </tr> <tr> <td style="text-align: left"><strong>注意力</strong></td> <td style="text-align: left">4DNH</td> <td style="text-align: left">24BTDNH + 12BT<sup>2</sup>NH</td> </tr> <tr> <td style="text-align: left"><strong>其他</strong></td> <td style="text-align: left">D</td> <td style="text-align: left">BTD</td> </tr> <tr> <td style="text-align: left"><strong>词汇表</strong></td> <td style="text-align: left">DV（总计，非每层）</td> <td style="text-align: left">12BTDV</td> </tr> </tbody> </table> <ul> <li>MLP块的参数数量在总参数数量中占主导地位，并且只要序列长度<d-math>T &lt; 8D</d-math>，MLP块也主导FLOPs预算。</li> <li>对于合理的上下文长度，训练期间的总FLOPs预算可以很好地用\(6 \cdot \text{num_params} \cdot \text{num_tokens}\)来近似。</li> <li>在推理期间，我们的KV缓存大约是每个缓存\(2 \cdot S \cdot L \cdot N \cdot H\)，尽管架构上的修改通常可以减少这个值。</li> </ul> <h2 id="a-few-problems-to-work">几个练习题</h2> <p><strong>问题1：</strong> 一个模型，其<d-math>D=4096</d-math>，<d-math>F=4 \cdot D</d-math>，<d-math>V=32,000</d-math>，<d-math>L=64</d-math>，有多少参数？其中注意力参数占多大比例？每个token的KV缓存有多大？<em>你可以假设<d-math>N\cdot H=D</d-math>和多头注意力，使用int8 KVs。</em></p> <details><summary>点击这里查看答案。</summary> <ol> <li>总参数大约是 \(L \cdot (3DF + 4DNH + D) + 2DV\)。对于给定的数字，这是 \(64 \cdot (3 \cdot 4e3 \cdot 16e3 + 4 \cdot 4e3 \cdot 4e3 + 4e3) + 2 \cdot 4e3 \cdot 32e3 = 16e9\)，即16B参数。</li> <li>注意力参数与总参数的比例通常是 \(4DNH / (4DNH + 3DF) = 4D^2 / (4D^2 + 12D^2) = 1/4\)。这告诉我们大约1/4的参数用于注意力。</li> <li>每个token，我们的KV缓存是 \(2 \cdot L \cdot N \cdot H = 2 \cdot 64 \cdot 4096\)（int8格式），即<code class="language-plaintext highlighter-rouge">512kB / token</code>。</li> </ol> </details> <p><strong>问题2：</strong> 在<code class="language-plaintext highlighter-rouge">{'X': 4, 'Y': 8, 'Z': 4}</code>上执行 A[B<sub>X</sub>, D<sub>Y</sub>] *<sub>D</sub> W[D<sub>Y</sub>, F] 需要多少总FLOPs？每个TPU执行多少FLOPs？</p> <details><summary>点击这里查看答案。</summary> <p>该操作的总“理论”FLOPs是 \(2 \cdot B \cdot D \cdot F\)。然而，因为计算没有在Z维度上分片，我们实际上多做了Z倍的FLOPs，意味着总FLOPs为 \(2 \cdot B \cdot D \cdot F \cdot Z\)。由于计算在其他维度上是分片的，每个设备的总FLOPs大约是 \(2 \cdot B \cdot D \cdot F / (X \cdot Y)\)。</p> </details> <p><strong>问题3：</strong> 执行<d-math>A[I,J,K,L] * B[I,J,M,N,O] \rightarrow C[K,L,M,N,O]</d-math>涉及多少FLOPs？</p> <details><summary>点击这里查看答案。</summary> <p>遵循上述规则，我们有I和J作为收缩维度，K、L、M、N和O作为非收缩维度。我们没有“批处理维度”，所以这只是 \(2 \cdot I \cdot J \cdot K \cdot L \cdot M \cdot N \cdot O\)，即所有轴的乘积之和。如果我们有一个共享轴，它只会被计算一次。</p> </details> <p><strong>问题4：</strong> 自注意力的算术强度是多少（忽略Q/K/V/O投影）？<em>以Q和KV长度T和S的函数形式给出答案。</em> 在什么上下文长度下，注意力是FLOPs受限的？给定我们TPU的HBM带宽，绘制随着上下文长度增长，注意力与FFW块的有效相对成本图。</p> <details><summary>点击这里查看答案。</summary> <p>自注意力需要加载\(Q\)、\(K\)和\(V\)激活，然后计算\(\text{softmax}(Q \cdot K) \cdot V\)，然后将结果写回HBM。这将使用Flash Attention完成，所以这个数学计算有一些注意事项，但基本上在bf16中，自注意力执行</p> \[\text{Q[B,T,N,H]} \rightarrow_\text{reshape} \text{Q[B, T, K, G, H]} \cdot \text{K[B, S, K, H]} \rightarrow \text{O[B, T, S, K, G]}\] \[U=\text{softmax}_S(\text{O[B, T, S, K, G]}) \] \[\text{U[B, T, S, K, G]} \cdot \text{V[B, S, K, H]} \rightarrow \text{X[B, T, K, G, H]}\] <p>所以我们的总字节数是 \(2 * \text{sizeof}(Q) + 2 * \text{sizeof(K or V)} = 4BTNH + 4BSKH = 4BHK * (TG + S)\)，总FLOPs是 \(4BTSNH + O(BTSN)\)，算术强度是 \(4BTSKGH / (4BHK * (TG + S))\)。</p> <p>所以基本上，在预填充期间，我们有\(S=T\)，所以我们的算术强度是\(4BT^2KGH / 4BHKT \cdot (G+1) = TG/(G + 1) = O(T)\)。在生成期间，\(T=1\)，所以我们有\(4BSKGH / (4BHK \cdot (G + S)) = SG / (G + S) \rightarrow G\)，假设\(S\)非常大。根据你如何解释这个问题，在预填充或训练期间，假设没有序列分片，自注意力在S=240时是计算受限的。在生成期间，我们永远不会是计算受限的，因为\(G\)很小。然而，你可以看到，增加\(G\)会使我们更接近计算受限。</p> </details> <p><strong>问题5：</strong> 在什么序列长度下，自注意力的FLOPs等于QKVO投影的FLOPs？</p> <details><summary>点击这里查看答案。</summary> <p>这纯粹是关于何时\(24BTDNH == 12BT^2NH\)的问题。简化后我们得到\(2D = T\)，例如对于\(D=4096\)，这是\(8192\)。这告诉我们，对于大多数合理的上下文长度，矩阵乘法的FLOPs更大。</p> </details> <p><strong>问题6：</strong> 假设我们在前向传播过程中只保存Transformer层中7个主要矩阵乘法（Q, K, V, O + 三个FFW矩阵）的输出。在反向传播过程中，我们需要“重新物化”多少额外的FLOPs？</p> <details><summary>点击这里查看答案。</summary> <p>只保存七个矩阵乘法的输出（Q, K, V, O, W₁, W₂, W₃）意味着反向传播必须重新计算两个注意力矩阵乘法</p> \[QK^{\top} \quad\text{和}\quad \operatorname{softmax}(QK^{\top})V.\] <p>每个都是在\(B\)个序列和\(N\)个头上批处理的\(T \times T\)矩阵乘法，所以额外的FLOPs是</p> \[4 \; B \, T^{2} \, N \, H.\] <p>所有其他重新计算的操作都只是\(O(BTD)\)。</p> </details> <p><strong>问题7：</strong> DeepSeek v3声称它在14.8T个token上训练了279万H800小时（<a href="https://arxiv.org/pdf/2412.19437v1" rel="external nofollow noopener" target="_blank">来源</a>）。鉴于它有37B个激活参数，他们大致达到了什么样的硬件利用率？<em>提示：注意他们使用了没有结构化稀疏性的FP8 FLOPs。</em></p> <details><summary>点击这里查看答案。</summary> <p>从规格表<a href="https://lenovopress.lenovo.com/lp1814.pdf" rel="external nofollow noopener" target="_blank">这里</a>，我们发现带稀疏性的FP8性能为3,026 TFLOPs/s，或者通常不带稀疏性时是这个值的一半（<code class="language-plaintext highlighter-rouge">1.513e15</code> FLOPs/s）。279万H800小时意味着<code class="language-plaintext highlighter-rouge">2.79e6 * 1.513e15 * 60 * 60 = 1.52e25</code>总FLOPs。鉴于激活参数数量为37B，这次训练运行应该使用了大约<code class="language-plaintext highlighter-rouge">6 * 37e9 * 14.8e12 = 3.3e24</code> FLOPs。这意味着FLOPs利用率大约是<code class="language-plaintext highlighter-rouge">3.3e24 / 1.52e25 = 21.7%</code>。</p> </details> <p><strong>问题8：</strong> 专家混合（MoE）模型有\(E\)个标准密集MLP块的副本，每个token激活其中\(k\)个专家。在TPU v5e上，对于权重为int8的MoE，需要多大的批大小（以token为单位）才能达到计算受限？对于有256个（路由）专家且\(k=8\)的DeepSeek，这个数字是多少？</p> <details><summary>点击这里查看答案。</summary> <p>因为我们有\(E\)个每个专家的副本，在int8中，我们需要加载\(E \cdot D \cdot F\)字节。因为每个token激活\(k\)个专家，我们有\(2\cdot k \cdot B \cdot D \cdot F\) FLOPs。要使用bfloat16 FLOPs达到计算受限，我们需要算术强度超过240，这发生在\((2\cdot k \cdot BDF) / EDF &gt; 240\)或\(k \cdot B / E &gt; 120\)时。</p> <p>因此，我们需要\(B &gt; 120 \cdot E / k\)才能达到计算受限。对于DeepSeek，这给我们\(B &gt; 120 \cdot 256 / 8 = 3840\)。这在生成时是一个非常大的批大小。</p> </details> <h3 class="next-section">第4部分到此结束！关于第5部分（扩展Transformer训练），<a href="training.html">请点击这里</a>！</h3> <h2 id="appendix">附录</h2> <h3 id="appendix-a-how-does-flash-attention-work">附录A：Flash Attention是如何工作的？</h3> <p>将Transformer扩展到非常长的上下文的传统反对意见是，注意力的FLOPs和内存使用量随上下文长度呈二次方增长。虽然注意力QK乘积的形状确实是<d-math>[B, S, T, N]</d-math>（其中B是批大小，S和T是Q和K的序列维度，N是头的数量），但这一说法带有一些重要的注意事项：</p> <ol> <li>正如我们在第4节中指出的，即使这是二次方的，注意力的FLOPs也只有在\(S &gt; 8 \cdot D\)时才占主导地位，特别是在训练期间，单个注意力矩阵的内存与内存中存在的所有权重和激活检查点相比是很小的，尤其是在分片的情况下。</li> <li>我们不需要为了计算注意力而物化整个注意力矩阵！我们可以计算局部和与最大值，从而避免物化超过一小块数组。虽然总FLOPs仍然是二次方的，但我们大大减少了内存压力。</li> </ol> <p>这第二个观察首先由<a href="https://arxiv.org/abs/2112.05682" rel="external nofollow noopener" target="_blank">Rabe等人于2021年</a>提出，后来在<a href="https://arxiv.org/abs/2205.14135" rel="external nofollow noopener" target="_blank">Flash Attention论文</a>（Dao等人，2022年）中再次提出。基本思想是将K/V分块计算注意力，我们计算局部的softmax和一些辅助统计数据，然后将它们传递给下一个块，后者将其与自己的局部分块结合起来。具体来说，我们计算</p> <ol> <li> <strong>M：</strong> \(q \cdot k\)在序列维度上的运行最大值</li> <li> <strong>O：</strong> 在序列维度上的运行完整注意力softmax</li> <li> <strong>L：</strong> 运行分母\(\sum_i (q \cdot k_i - \text{running max})\)</li> </ol> <p>有了这些，我们只需恒定的内存量就可以计算出新的最大值、新的运行总和和新的输出。为了粗略地描述这是如何工作的，注意力大致是这个操作：</p><span> \[\text{Attn}(Q, K, V) = \sum_i \frac{\exp(Q \cdot K_i - \max_j Q \cdot K_j) V_i}{\sum_l \exp(Q \cdot K_l - \max_j Q \cdot K_j)}\] </span><p>减去最大值是为了数值稳定性，并且可以在不影响结果的情况下添加，因为\(\sum_i \exp(a_i + b) = \exp(b) \sum \exp(a)\)。只看上面的分母，如果我们想象有两个连续的键向量块，\(K^1\)和\(K^2\)，并且我们为每个块计算局部softmax和\(L^1\)和\(L^2\)</p><span> \[L^1 = \sum_i \exp(Q \cdot K_i^1 - \max_j Q \cdot K_j^1)\] \[L^2 = \sum_i \exp(Q \cdot K_i^2 - \max_j Q \cdot K_j^2)\] </span><p>然后我们可以通过使用以下公式将它们组合成这两个块的完整softmax和</p><span> \[L^\text{combined} = \exp(M^1 - \max(M^1, M^2)) \cdot L^1 + \exp(M^2 - \max(M^1, M^2)) \cdot L^2\] </span><p>其中</p><span> \[M^1 = \max_j Q \cdot K_j^1 \text{ and } M^2 = \max_j Q \cdot K_j^2\] </span><p>这也可以对整个softmax进行，为我们提供了一种累积任意大softmax和的方法。以下是Flash Attention论文中的完整算法。</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/flash-algo-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/flash-algo-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/flash-algo-1400.webp 1400w" type="image/webp"/> <img class="img-fluid" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/flash-algo.png" width="100%"/> </picture> </figure> <p>从硬件的角度来看，这使我们能够将Q的块放入VMEM（上述算法称之为片上SRAM），因此我们只需在每次迭代时加载KV块，从而降低了算术强度。我们也可以将运行统计信息保存在VMEM中。</p> <p>最后一个值得强调的微妙点是注意力softmax的一个属性，它被用来使Flash VJP（反向模式导数）计算在训练中变得可行。如果我们定义一个中间softmax数组为：</p><span> \[S_{ij} = \frac{e^{\tau q_i \cdot k_j}}{\sum_k e^{\tau q_i \cdot k_j}}\] </span><p>在注意力中，我们从反向模式的<em>dO</em>和<em>V</em>数组中获得<em>dS</em>：</p><span> \[dS_{ij} = dO_{id} \cdot_d V_{jd} = \sum_d dO_{id} V_{jd}\] </span><p>在将此梯度反向传播到Q和K的过程中</p><span> \[d(q_i \cdot k_j) = (dS_{ij} - S_{ij} \cdot_j dS_{ij}) S_{ij}\] </span><p>我们利用一个恒等式，它允许我们将沿大键<strong>长度</strong>维度的收缩与沿特征<strong>深度</strong>维度的局部收缩进行交换。</p><span> \[\begin{align*} S_{ij} \cdot_j dS_{ij} &amp;= \sum_j \frac{e^{\tau q_i \cdot k_j}}{\sum_k e^{\tau q_i \cdot k_k}} \sum_d dO_{id} V_{jd} \\ &amp;= \sum_d dO_{id} \sum_j \frac{e^{\tau q_i \cdot k_j}}{\sum_k e^{\tau q_i \cdot k_k}} V_{jd} \\ &amp;= \sum_d dO_{id} O_{id} \\ &amp;= dO_{id} \cdot_d O_{id} \end{align*}\] </span><p>这种替换对于能够为VJP实现序列块<em>局部</em>计算至关重要，并使得更智能的分片方案（如环形注意力）成为可能。</p> </d-article> <d-appendix>
+<style>
+
+d-appendix {
+  contain: layout style;
+  font-size: 0.8em;
+  line-height: 1.7em;
+  margin-top: 60px;
+  margin-bottom: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  color: rgba(0,0,0,0.5);
+  padding-top: 60px;
+  padding-bottom: 48px;
+}
+
+d-appendix h3 {
+  grid-column: page-start / text-start;
+  font-size: 15px;
+  font-weight: 500;
+  margin-top: 1em;
+  margin-bottom: 0;
+  color: rgba(0,0,0,0.65);
+}
+
+d-appendix h3 + * {
+  margin-top: 1em;
+}
+
+d-appendix ol {
+  padding: 0 0 0 15px;
+}
+
+@media (min-width: 768px) {
+  d-appendix ol {
+    padding: 0 0 0 30px;
+    margin-left: -30px;
+  }
+}
+
+d-appendix li {
+  margin-bottom: 1em;
+}
+
+d-appendix a {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+d-appendix > * {
+  grid-column: text;
+}
+
+d-appendix > d-footnote-list,
+d-appendix > d-citation-list,
+d-appendix > distill-appendix {
+  grid-column: screen;
+}
+
+</style>
+<d-footnote-list style="">
+<style>
+
+d-footnote-list {
+  contain: layout style;
+}
+
+d-footnote-list > * {
+  grid-column: text;
+}
+
+d-footnote-list a.footnote-backlink {
+  color: rgba(0,0,0,0.3);
+  padding-left: 0.5em;
+}
+
+</style>
+<h3>脚注</h3>
+<ol><li id="d-footnote-1-listing">严格来说，这只在我们沿专家所在的同一轴进行数据或序列分片时才会发生。<a class="footnote-backlink" href="#d-footnote-1">[↩]</a></li></ol>
+</d-footnote-list> <d-citation-list style=""><style>
+d-citation-list {
+  contain: style;
+}
+
+d-citation-list .references {
+  grid-column: text;
+}
+
+d-citation-list .references .title {
+  font-weight: 500;
+}
+</style><h3 id="references">参考文献</h3><ol class="references" id="references-list"><li id="glu"><span class="title">GLU Variants Improve Transformer</span> <br/>Shazeer, N., 2020. arXiv [cs.LG]. </li><li id="mqa"><span class="title">Fast Transformer decoding: One write-head is all you need</span> <br/>Noam, S., 2019. arXiv [cs.NE]. </li><li id="gmqa"><span class="title">GQA: Training generalized multi-query transformer models from multi-head checkpoints</span> <br/>Ainslie, J., Lee-Thorp, J., de Jong, M., Zemlyanskiy, Y., Lebrón, F. and Sanghai, S., 2023. arXiv [cs.CL]. </li><li id="moe"><span class="title">Outrageously large neural networks: The Sparsely-Gated Mixture-of-experts layer</span> <br/>Shazeer, N., Mirhoseini, A., Maziarz, K., Davis, A., Le, Q., Hinton, G. and Dean, J., 2017. arXiv [cs.LG]. </li></ol></d-citation-list> <div class="base-grid appendix-entry"> <h3 style="grid-column: 0;">其他</h3> <p class="author-footnote" style="grid-column: text;"><sup>*</sup>在Google DeepMind工作，现就职于MatX。</p> </div> <div class="base-grid appendix-entry"> <h3 style="grid-column: 0;">引用</h3> <p class="author-footnote">在学术背景下引用，请按如下方式引用本作品：</p> <div class="author-footnote"> <div class="language-bibtex highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code>    <span class="c">Austin et al., "How to Scale Your Model", Google DeepMind, online, 2025.</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> </div> <p class="author-footnote">或作为BibTeX条目：</p> <div class="author-footnote"> <div class="language-bibtex highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code>    <span class="nc">@article</span><span class="p">{</span><span class="nl">scaling-book</span><span class="p">,</span>
+      <span class="na">title</span> <span class="p">=</span> <span class="s">{How to Scale Your Model}</span><span class="p">,</span>
+      <span class="na">author</span> <span class="p">=</span> <span class="s">{Austin, Jacob and Douglas, Sholto and Frostig, Roy and Levskaya, Anselm and Chen, Charlie and Vikram, Sharad
+      and Lebron, Federico and Choy, Peter and Ramasesh, Vinay and Webson, Albert and Pope, Reiner}</span><span class="p">,</span>
+      <span class="na">publisher</span> <span class="p">=</span> <span class="s">{Google DeepMind}</span><span class="p">,</span>
+      <span class="na">howpublished</span> <span class="p">=</span> <span class="s">{Online}</span><span class="p">,</span>
+      <span class="na">note</span> <span class="p">=</span> <span class="s">{Retrieved from https://jax-ml.github.io/scaling-book/}</span><span class="p">,</span>
+      <span class="na">year</span> <span class="p">=</span> <span class="s">{2025}</span>
+    <span class="p">}</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> </div> </div> </d-appendix> <d-bibliography src="/scaling-book/assets/bibliography/main.bib"></d-bibliography> <div id="giscus_thread" style="max-width: 930px; margin: 0 auto;"> <script>
+      let giscusTheme = determineComputedTheme();
+      let giscusAttributes = {
+        src: 'https://giscus.app/client.js',
+        'data-repo': 'jax-ml/scaling-book',
+        'data-repo-id': '',
+        'data-category': 'General',
+        'data-category-id': '',
+        'data-mapping': 'title',
+        'data-strict': '0',
+        'data-reactions-enabled': '1',
+        'data-emit-metadata': '0',
+        'data-input-position': 'bottom',
+        'data-theme': giscusTheme,
+        'data-loading': '1',
+        'data-lang': 'en',
+        crossorigin: 'anonymous',
+        async: '',
+      };
+
+      let giscusScript = document.createElement('script');
+      Object.entries(giscusAttributes).forEach(([key, value]) => giscusScript.setAttribute(key, value));
+      document.getElementById('giscus_thread').appendChild(giscusScript);
+    </script><script async="" crossorigin="anonymous" data-category="General" data-category-id="" data-emit-metadata="0" data-input-position="bottom" data-lang="en" data-loading="1" data-mapping="title" data-reactions-enabled="1" data-repo="jax-ml/scaling-book" data-repo-id="" data-strict="0" data-theme="light" src="https://giscus.app/client.js"></script><div class="giscus"><iframe allow="clipboard-write" class="giscus-frame giscus-frame--loading" scrolling="no" src="https://giscus.app/en/widget?origin=https%3A%2F%2Fjax-ml.github.io%2Fscaling-book%2Ftransformers%2F&amp;session=&amp;theme=light&amp;reactionsEnabled=1&amp;emitMetadata=0&amp;inputPosition=bottom&amp;repo=jax-ml%2Fscaling-book&amp;repoId=&amp;category=General&amp;categoryId=&amp;strict=0&amp;description=Here+we%27ll+do+a+quick+review+of+the+Transformer+architecture%2C+specifically+how+to+calculate+FLOPs%2C+bytes%2C+and+other+quantities+of+interest.&amp;backLink=https%3A%2F%2Fjax-ml.github.io%2Fscaling-book%2Ftransformers%2F&amp;term=All+the+Transformer+Math+You+Need+to+Know+%7C+How+To+Scale+Your+Model" style="opacity: 0;" title="Comments"></iframe></div> <noscript>请启用JavaScript以查看由giscus支持的<a href="http://giscus.app/?ref_noscript" rel="external nofollow noopener" target="_blank">评论。</a> </noscript> </div> </div> <footer class="sticky-bottom mt-5" role="contentinfo"> <div class="container"> © 版权所有 2025 . 由 <a href="https://jekyllrb.com/" rel="external nofollow noopener" target="_blank">Jekyll</a> 驱动，使用 <a href="https://github.com/alshedivat/al-folio" rel="external nofollow noopener" target="_blank">al-folio</a> 主题。由 <a href="https://pages.github.com/" rel="external nofollow noopener" target="_blank">GitHub Pages</a> 托管。 </div> </footer> <script crossorigin="anonymous" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/bootstrap.bundle.min.js"></script> <script crossorigin="anonymous" integrity="sha256-NdbiivsvWt7VYCt6hYNT3h/th9vSTL4EDWeGs5SN3DA=" src="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/js/mdb.min.js"></script> <script crossorigin="anonymous" defer="" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" src="https://cdn.jsdelivr.net/npm/medium-zoom@1.1.0/dist/medium-zoom.min.js"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/zoom.js?85ddb88934d28b74e78031fd54cf8308"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/no_defer.js?2781658a0a2b13ed609542042a859126"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/common.js?e0514a05c5c95ac1a93a8dfd5249b92e"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/copy_code.js?12775fdf7f95e901d7119054556e495f" type="text/javascript"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/jupyter_new_tab.js?d9f17b6adc2311cbabd747f4538bb15f"></script> <script crossorigin="anonymous" defer="" id="MathJax-script" integrity="sha256-MASABpB4tYktI2Oitl4t+78w/lyA+D7b/s9GEP0JOGI=" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" type="text/javascript"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/mathjax-setup.js?70d799092f862ad98c7876aa47712e20"></script> <script crossorigin="anonymous" defer="" src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/progress-bar.js?2f30e0e6801ea8f5036fa66e1ab0a71a" type="text/javascript"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/vanilla-back-to-top.min.js?f40d453793ff4f64e238e420181a1d17"></script> <script>
+    addBackToTop();
+  </script><div class="hidden" id="back-to-top"><svg viewbox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg></div> <div class="hiddendiv common"></div></body>
+</html>

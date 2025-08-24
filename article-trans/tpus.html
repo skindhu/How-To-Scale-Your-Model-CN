@@ -1,0 +1,2074 @@
+<!DOCTYPE html>
+
+<html class="" data-theme="light" data-theme-setting="system" lang="zh-CN">
+<head><link href="https://giscus.app/default.css" id="giscus-css" rel="stylesheet"/><style>#back-to-top{background:#000;-webkit-border-radius:50%;-moz-border-radius:50%;border-radius:50%;bottom:20px;-webkit-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);-moz-box-shadow:0 2px 5px 0 rgba(0,0,0,.26);box-shadow:0 2px 5px 0 rgba(0,0,0,.26);color:#fff;cursor:pointer;display:block;height:56px;opacity:1;outline:0;position:fixed;right:20px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-transition:bottom .2s,opacity .2s;-o-transition:bottom .2s,opacity .2s;-moz-transition:bottom .2s,opacity .2s;transition:bottom .2s,opacity .2s;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;width:56px;z-index:1}#back-to-top svg{display:block;fill:currentColor;height:20px;margin:11px auto 0;width:20px}#back-to-top.hidden{bottom:-56px;opacity:0}</style> <meta content="text/html; charset=utf-8" http-equiv="Content-Type"/> <meta charset="utf-8"/> <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport"/> <meta content="IE=edge" http-equiv="X-UA-Compatible"/> <title>如何理解 TPU | 如何扩展您的模型</title> <meta content=" " name="author"/> <meta content="本节将深入探讨 TPU 的工作原理、它们如何通过网络互连以实现多芯片训练和推理，以及这种架构对我们常用算法性能的影响。此外，本节内容对 GPU 用户也大有裨益！" name="description"/> <meta content="scaling, jax, llms, transformers, tpus, google, deepmind, parallelism, pallas" name="keywords"/> <link href="https://jax-ml.github.io/scaling-book/assets/css/bootstrap.min.css?a4b3f509e79c54a512b890d73235ef04" rel="stylesheet"/> <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/css/mdb.min.css" integrity="sha256-jpjYvU3G3N6nrrBwXJoVEYI/0zw8htfFnhT9ljN3JJw=" rel="stylesheet"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/academicons.min.css?f0b7046b84e425c55f3463ac249818f5" rel="stylesheet"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/scholar-icons.css?62b2ac103a88034e6882a5be5f3e2772" rel="stylesheet"/> <link defer="" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Roboto+Slab:100,300,400,500,700|Material+Icons&amp;display=swap" rel="stylesheet" type="text/css"/> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/jekyll-pygments-themes-vs.css?4ee1a2facd1a8a76347f4bd43a740500" id="highlight_theme_light" media="" rel="stylesheet"/> <link href="https://jax-ml.github.io/scaling-book/assets/img/favicon.png?fddbd8c2ec231ba2060e67c85de32a55" rel="shortcut icon"/> <link href="https://jax-ml.github.io/scaling-book/assets/css/main.css?d41d8cd98f00b204e9800998ecf8427e" rel="stylesheet"/> <link href="tpus.html" rel="canonical"/> <style id="distill-prerendered-styles" type="text/css">/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+html {
+  font-size: 14px;
+	line-height: 1.6em;
+  /* font-family: "Libre Franklin", "Helvetica Neue", sans-serif; */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
+  /*, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";*/
+  text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media(min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: #004276;
+}
+
+figure {
+  margin: 0;
+}
+
+table {
+	border-collapse: collapse;
+	border-spacing: 0;
+}
+
+table th {
+	text-align: left;
+}
+
+table thead {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+table thead th {
+  padding-bottom: 0.5em;
+}
+
+table tbody :first-child td {
+  padding-top: 0.5em;
+}
+
+pre {
+  overflow: auto;
+  max-width: 100%;
+}
+
+p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+sup, sub {
+  vertical-align: baseline;
+  position: relative;
+  top: -0.4em;
+  line-height: 1em;
+}
+
+sub {
+  top: 0.4em;
+}
+
+.kicker,
+.marker {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+
+/* Headline */
+
+@media(min-width: 1024px) {
+  d-title h1 span {
+    display: block;
+  }
+}
+
+/* Figure */
+
+figure {
+  position: relative;
+  margin-bottom: 2.5em;
+  margin-top: 1.5em;
+}
+
+figcaption+figure {
+
+}
+
+figure img {
+  width: 100%;
+}
+
+figure svg text,
+figure svg tspan {
+}
+
+figcaption,
+.figcaption {
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 12px;
+  line-height: 1.5em;
+}
+
+@media(min-width: 1024px) {
+figcaption,
+.figcaption {
+    font-size: 13px;
+  }
+}
+
+figure.external img {
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.1);
+  padding: 18px;
+  box-sizing: border-box;
+}
+
+figcaption a {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+figcaption b,
+figcaption strong, {
+  font-weight: 600;
+  color: rgba(0, 0, 0, 1.0);
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@supports not (display: grid) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    display: block;
+    padding: 8px;
+  }
+}
+
+.base-grid,
+distill-header,
+d-title,
+d-abstract,
+d-article,
+d-appendix,
+distill-appendix,
+d-byline,
+d-footnote-list,
+d-citation-list,
+distill-footer {
+  display: grid;
+  justify-items: stretch;
+  grid-template-columns: [screen-start] 8px [page-start kicker-start text-start gutter-start middle-start] 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr [text-end page-end gutter-end kicker-end middle-end] 8px [screen-end];
+  grid-column-gap: 8px;
+}
+
+.grid {
+  display: grid;
+  grid-column-gap: 8px;
+}
+
+@media(min-width: 768px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start middle-start text-start] 45px 45px 45px 45px 45px 45px 45px 45px [ kicker-end text-end gutter-start] 45px [middle-end] 45px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 16px;
+  }
+
+  .grid {
+    grid-column-gap: 16px;
+  }
+}
+
+@media(min-width: 1000px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start] 50px [middle-start] 50px [text-start kicker-end] 50px 50px 50px 50px 50px 50px 50px 50px [text-end gutter-start] 50px [middle-end] 50px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 16px;
+  }
+
+  .grid {
+    grid-column-gap: 16px;
+  }
+}
+
+@media(min-width: 1180px) {
+  .base-grid,
+  distill-header,
+  d-title,
+  d-abstract,
+  d-article,
+  d-appendix,
+  distill-appendix,
+  d-byline,
+  d-footnote-list,
+  d-citation-list,
+  distill-footer {
+    grid-template-columns: [screen-start] 1fr [page-start kicker-start] 60px [middle-start] 60px [text-start kicker-end] 60px 60px 60px 60px 60px 60px 60px 60px [text-end gutter-start] 60px [middle-end] 60px [page-end gutter-end] 1fr [screen-end];
+    grid-column-gap: 32px;
+  }
+
+  .grid {
+    grid-column-gap: 32px;
+  }
+}
+
+
+
+
+.base-grid {
+  grid-column: screen;
+}
+
+/* .l-body,
+d-article > *  {
+  grid-column: text;
+}
+
+.l-page,
+d-title > *,
+d-figure {
+  grid-column: page;
+} */
+
+.l-gutter {
+  grid-column: gutter;
+}
+
+.l-text,
+.l-body {
+  grid-column: text;
+}
+
+.l-page {
+  grid-column: page;
+}
+
+.l-body-outset {
+  grid-column: middle;
+}
+
+.l-page-outset {
+  grid-column: page;
+}
+
+.l-screen {
+  grid-column: screen;
+}
+
+.l-screen-inset {
+  grid-column: screen;
+  padding-left: 16px;
+  padding-left: 16px;
+}
+
+
+/* Aside */
+
+d-article aside {
+  grid-column: gutter;
+  font-size: 12px;
+  line-height: 1.6em;
+  color: rgba(0, 0, 0, 0.6)
+}
+
+@media(min-width: 768px) {
+  aside {
+    grid-column: gutter;
+  }
+
+  .side {
+    grid-column: gutter;
+  }
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-title {
+  padding: 2rem 0 1.5rem;
+  contain: layout style;
+  overflow-x: hidden;
+}
+
+@media(min-width: 768px) {
+  d-title {
+    padding: 4rem 0 1.5rem;
+  }
+}
+
+d-title h1 {
+  grid-column: text;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.1em;
+  margin: 0 0 0.5rem;
+}
+
+@media(min-width: 768px) {
+  d-title h1 {
+    font-size: 50px;
+  }
+}
+
+d-title p {
+  font-weight: 300;
+  font-size: 1.2rem;
+  line-height: 1.55em;
+  grid-column: text;
+}
+
+d-title .status {
+  margin-top: 0px;
+  font-size: 12px;
+  color: #009688;
+  opacity: 0.8;
+  grid-column: kicker;
+}
+
+d-title .status span {
+  line-height: 1;
+  display: inline-block;
+  padding: 6px 0;
+  border-bottom: 1px solid #80cbc4;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-byline {
+  contain: style;
+  overflow: hidden;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  font-size: 0.8rem;
+  line-height: 1.8em;
+  padding: 1.5rem 0;
+  min-height: 1.8em;
+}
+
+
+d-byline .byline {
+  grid-template-columns: 1fr 1fr;
+  grid-column: text;
+}
+
+@media(min-width: 768px) {
+  d-byline .byline {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+  }
+}
+
+d-byline .authors-affiliations {
+  grid-column-end: span 3;
+  grid-template-columns: 1fr 1fr 1fr;
+  margin-bottom: 1em;
+}
+
+@media(min-width: 768px) {
+  d-byline .authors-affiliations {
+    margin-bottom: 0;
+  }
+}
+
+d-byline h3 {
+  font-size: 0.6rem;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.5);
+  margin: 0;
+  text-transform: uppercase;
+}
+
+d-byline p {
+  margin: 0;
+}
+
+d-byline a,
+d-article d-byline a {
+  color: rgba(0, 0, 0, 0.8);
+  text-decoration: none;
+  border-bottom: none;
+}
+
+d-article d-byline a:hover {
+  text-decoration: underline;
+  border-bottom: none;
+}
+
+d-byline p.author {
+  font-weight: 500;
+}
+
+d-byline .affiliations {
+
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+d-article {
+  contain: layout style;
+ border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding-top: 2rem;
+  color: rgba(0, 0, 0, 0.8);
+}
+
+d-article > * {
+  grid-column: text;
+}
+
+@media(min-width: 768px) {
+  d-article {
+    font-size: 16px;
+  }
+}
+
+@media(min-width: 1024px) {
+  d-article {
+    font-size: 1.06rem;
+    line-height: 1.7em;
+  }
+}
+
+
+/* H2 */
+
+
+d-article .marker {
+  text-decoration: none;
+  border: none;
+  counter-reset: section;
+  grid-column: kicker;
+  line-height: 1.7em;
+}
+
+d-article .marker:hover {
+  border: none;
+}
+
+d-article .marker span {
+  padding: 0 3px 4px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  position: relative;
+  top: 4px;
+}
+
+d-article .marker:hover span {
+  color: rgba(0, 0, 0, 0.7);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.7);
+}
+
+d-article h2 {
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 1.25em;
+  margin: 2rem 0 1.5rem 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  padding-bottom: 1rem;
+}
+
+@media(min-width: 1024px) {
+  d-article h2 {
+    font-size: 36px;
+  }
+}
+
+/* H3 */
+
+d-article h3 {
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.4em;
+  margin-bottom: 1em;
+  margin-top: 2em;
+}
+
+@media(min-width: 1024px) {
+  d-article h3 {
+    font-size: 20px;
+  }
+}
+
+/* H4 */
+
+d-article h4 {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 14px;
+  line-height: 1.4em;
+}
+
+d-article a {
+  color: inherit;
+}
+
+d-article p,
+d-article ul,
+d-article ol,
+d-article blockquote {
+  margin-top: 0;
+  margin-bottom: 1em;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+d-article blockquote {
+  border-left: 2px solid rgba(0, 0, 0, 0.2);
+  padding-left: 2em;
+  font-style: italic;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+d-article a {
+  border-bottom: 1px solid var(--global-underline-color);
+  text-decoration: none;
+}
+
+d-article a:hover {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.8);
+}
+
+d-article .link {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+d-article ul,
+d-article ol {
+  padding-left: 24px;
+}
+
+d-article li {
+  margin-bottom: 1em;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+d-article li:last-child {
+  margin-bottom: 0;
+}
+
+d-article pre {
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+d-article hr {
+  grid-column: screen;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  margin-top: 60px;
+  margin-bottom: 60px;
+}
+
+d-article section {
+  margin-top: 60px;
+  margin-bottom: 60px;
+}
+
+d-article span.equation-mimic {
+  font-family: georgia;
+  font-size: 115%;
+  font-style: italic;
+}
+
+d-article > d-code,
+d-article section > d-code  {
+  display: block;
+}
+
+d-article > d-math[block],
+d-article section > d-math[block]  {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  d-article > d-code,
+  d-article section > d-code,
+  d-article > d-math[block],
+  d-article section > d-math[block] {
+      overflow-x: scroll;
+      -ms-overflow-style: none;  // IE 10+
+      overflow: -moz-scrollbars-none;  // Firefox
+  }
+
+  d-article > d-code::-webkit-scrollbar,
+  d-article section > d-code::-webkit-scrollbar,
+  d-article > d-math[block]::-webkit-scrollbar,
+  d-article section > d-math[block]::-webkit-scrollbar {
+    display: none;  // Safari and Chrome
+  }
+}
+
+d-article .citation {
+  color: #668;
+  cursor: pointer;
+}
+
+d-include {
+  width: auto;
+  display: block;
+}
+
+d-figure {
+  contain: layout style;
+}
+
+/* KaTeX */
+
+.katex, .katex-prerendered {
+  contain: style;
+  display: inline-block;
+}
+
+/* Tables */
+
+d-article table {
+  border-collapse: collapse;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+d-article table th {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+d-article table td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+d-article table tr:last-of-type td {
+  border-bottom: none;
+}
+
+d-article table th,
+d-article table td {
+  font-size: 15px;
+  padding: 2px 8px;
+}
+
+d-article table tbody :first-child td {
+  padding-top: 2px;
+}
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+span.katex-display {
+  text-align: left;
+  padding: 8px 0 8px 0;
+  margin: 0.5em 0 0.5em 1em;
+}
+
+span.katex {
+  -webkit-font-smoothing: antialiased;
+;
+  font-size: 1.18em;
+}
+
+/*
+ * Copyright 2018 The Distill Template Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@media print {
+
+  @page {
+    size: 8in 11in;
+    @bottom-right {
+      content: counter(page) " of " counter(pages);
+    }
+  }
+
+  html {
+    /* no general margins -- CSS Grid takes care of those */
+  }
+
+  p, code {
+    page-break-inside: avoid;
+  }
+
+  h2, h3 {
+    page-break-after: avoid;
+  }
+
+  d-header {
+    visibility: hidden;
+  }
+
+  d-footer {
+    display: none!important;
+  }
+
+}
+</style><script src="https://jax-ml.github.io/scaling-book/assets/js/theme.js?9a0c749ec5240d9cda97bc72359a72c0"></script> <link defer="" href="https://jax-ml.github.io/scaling-book/assets/css/jekyll-pygments-themes-native.css?5847e5ed4a4568527aa6cfab446049ca" id="highlight_theme_dark" media="none" rel="stylesheet"/> <script>
+    initTheme();
+  </script> <script src="https://jax-ml.github.io/scaling-book/assets/js/distillpub/template.v2.js"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/distillpub/transforms.v2.js"></script> <style type="text/css">{{page._styles}}</style> <style type="text/css">/* Chart.js */
+@-webkit-keyframes chartjs-render-animation{from{opacity:0.99}to{opacity:1}}@keyframes chartjs-render-animation{from{opacity:0.99}to{opacity:1}}.chartjs-render-monitor{-webkit-animation:chartjs-render-animation 0.001s;animation:chartjs-render-animation 0.001s;}</style><style type="text/css">.medium-zoom-overlay{position:fixed;top:0;right:0;bottom:0;left:0;opacity:0;transition:opacity .3s;will-change:opacity}.medium-zoom--opened .medium-zoom-overlay{cursor:pointer;cursor:zoom-out;opacity:1}.medium-zoom-image{cursor:pointer;cursor:zoom-in;transition:transform .3s cubic-bezier(.2,0,.2,1)!important}.medium-zoom-image--hidden{visibility:hidden}.medium-zoom-image--opened{position:relative;cursor:pointer;cursor:zoom-out;will-change:transform}</style><style type="text/css">.CtxtMenu_InfoClose {  top:.2em; right:.2em;}
+.CtxtMenu_InfoContent {  overflow:auto; text-align:left; font-size:80%;  padding:.4em .6em; border:1px inset; margin:1em 0px;  max-height:20em; max-width:30em; background-color:#EEEEEE;  white-space:normal;}
+.CtxtMenu_Info.CtxtMenu_MousePost {outline:none;}
+.CtxtMenu_Info {  position:fixed; left:50%; width:auto; text-align:center;  border:3px outset; padding:1em 2em; background-color:#DDDDDD;  color:black;  cursor:default; font-family:message-box; font-size:120%;  font-style:normal; text-indent:0; text-transform:none;  line-height:normal; letter-spacing:normal; word-spacing:normal;  word-wrap:normal; white-space:nowrap; float:none; z-index:201;  border-radius: 15px;                     /* Opera 10.5 and IE9 */  -webkit-border-radius:15px;               /* Safari and Chrome */  -moz-border-radius:15px;                  /* Firefox */  -khtml-border-radius:15px;                /* Konqueror */  box-shadow:0px 10px 20px #808080;         /* Opera 10.5 and IE9 */  -webkit-box-shadow:0px 10px 20px #808080; /* Safari 3 & Chrome */  -moz-box-shadow:0px 10px 20px #808080;    /* Forefox 3.5 */  -khtml-box-shadow:0px 10px 20px #808080;  /* Konqueror */  filter:progid:DXImageTransform.Microsoft.dropshadow(OffX=2, OffY=2, Color="gray", Positive="true"); /* IE */}
+</style><style type="text/css">.CtxtMenu_MenuClose {  position:absolute;  cursor:pointer;  display:inline-block;  border:2px solid #AAA;  border-radius:18px;  -webkit-border-radius: 18px;             /* Safari and Chrome */  -moz-border-radius: 18px;                /* Firefox */  -khtml-border-radius: 18px;              /* Konqueror */  font-family: "Courier New", Courier;  font-size:24px;  color:#F0F0F0}
+.CtxtMenu_MenuClose span {  display:block; background-color:#AAA; border:1.5px solid;  border-radius:18px;  -webkit-border-radius: 18px;             /* Safari and Chrome */  -moz-border-radius: 18px;                /* Firefox */  -khtml-border-radius: 18px;              /* Konqueror */  line-height:0;  padding:8px 0 6px     /* may need to be browser-specific */}
+.CtxtMenu_MenuClose:hover {  color:white!important;  border:2px solid #CCC!important}
+.CtxtMenu_MenuClose:hover span {  background-color:#CCC!important}
+.CtxtMenu_MenuClose:hover:focus {  outline:none}
+</style><style type="text/css">.CtxtMenu_Menu {  position:absolute;  background-color:white;  color:black;  width:auto; padding:5px 0px;  border:1px solid #CCCCCC; margin:0; cursor:default;  font: menu; text-align:left; text-indent:0; text-transform:none;  line-height:normal; letter-spacing:normal; word-spacing:normal;  word-wrap:normal; white-space:nowrap; float:none; z-index:201;  border-radius: 5px;                     /* Opera 10.5 and IE9 */  -webkit-border-radius: 5px;             /* Safari and Chrome */  -moz-border-radius: 5px;                /* Firefox */  -khtml-border-radius: 5px;              /* Konqueror */  box-shadow:0px 10px 20px #808080;         /* Opera 10.5 and IE9 */  -webkit-box-shadow:0px 10px 20px #808080; /* Safari 3 & Chrome */  -moz-box-shadow:0px 10px 20px #808080;    /* Forefox 3.5 */  -khtml-box-shadow:0px 10px 20px #808080;  /* Konqueror */}
+.CtxtMenu_MenuItem {  padding: 1px 2em;  background:transparent;}
+.CtxtMenu_MenuArrow {  position:absolute; right:.5em; padding-top:.25em; color:#666666;  font-family: null; font-size: .75em}
+.CtxtMenu_MenuActive .CtxtMenu_MenuArrow {color:white}
+.CtxtMenu_MenuArrow.CtxtMenu_RTL {left:.5em; right:auto}
+.CtxtMenu_MenuCheck {  position:absolute; left:.7em;  font-family: null}
+.CtxtMenu_MenuCheck.CtxtMenu_RTL { right:.7em; left:auto }
+.CtxtMenu_MenuRadioCheck {  position:absolute; left: .7em;}
+.CtxtMenu_MenuRadioCheck.CtxtMenu_RTL {  right: .7em; left:auto}
+.CtxtMenu_MenuInputBox {  padding-left: 1em; right:.5em; color:#666666;  font-family: null;}
+.CtxtMenu_MenuInputBox.CtxtMenu_RTL {  left: .1em;}
+.CtxtMenu_MenuComboBox {  left:.1em; padding-bottom:.5em;}
+.CtxtMenu_MenuSlider {  left: .1em;}
+.CtxtMenu_SliderValue {  position:absolute; right:.1em; padding-top:.25em; color:#333333;  font-size: .75em}
+.CtxtMenu_SliderBar {  outline: none; background: #d3d3d3}
+.CtxtMenu_MenuLabel {  padding: 1px 2em 3px 1.33em;  font-style:italic}
+.CtxtMenu_MenuRule {  border-top: 1px solid #DDDDDD;  margin: 4px 3px;}
+.CtxtMenu_MenuDisabled {  color:GrayText}
+.CtxtMenu_MenuActive {  background-color: #606872;  color: white;}
+.CtxtMenu_MenuDisabled:focus {  background-color: #E8E8E8}
+.CtxtMenu_MenuLabel:focus {  background-color: #E8E8E8}
+.CtxtMenu_ContextMenu:focus {  outline:none}
+.CtxtMenu_ContextMenu .CtxtMenu_MenuItem:focus {  outline:none}
+.CtxtMenu_SelectionMenu {  position:relative; float:left;  border-bottom: none; -webkit-box-shadow:none; -webkit-border-radius:0px; }
+.CtxtMenu_SelectionItem {  padding-right: 1em;}
+.CtxtMenu_Selection {  right: 40%; width:50%; }
+.CtxtMenu_SelectionBox {  padding: 0em; max-height:20em; max-width: none;  background-color:#FFFFFF;}
+.CtxtMenu_SelectionDivider {  clear: both; border-top: 2px solid #000000;}
+.CtxtMenu_Menu .CtxtMenu_MenuClose {  top:-10px; left:-10px}
+</style><style id="MJX-CHTML-styles">
+mjx-container[jax="CHTML"] {
+  line-height: 0;
+}
+
+mjx-container [space="1"] {
+  margin-left: .111em;
+}
+
+mjx-container [space="2"] {
+  margin-left: .167em;
+}
+
+mjx-container [space="3"] {
+  margin-left: .222em;
+}
+
+mjx-container [space="4"] {
+  margin-left: .278em;
+}
+
+mjx-container [space="5"] {
+  margin-left: .333em;
+}
+
+mjx-container [rspace="1"] {
+  margin-right: .111em;
+}
+
+mjx-container [rspace="2"] {
+  margin-right: .167em;
+}
+
+mjx-container [rspace="3"] {
+  margin-right: .222em;
+}
+
+mjx-container [rspace="4"] {
+  margin-right: .278em;
+}
+
+mjx-container [rspace="5"] {
+  margin-right: .333em;
+}
+
+mjx-container [size="s"] {
+  font-size: 70.7%;
+}
+
+mjx-container [size="ss"] {
+  font-size: 50%;
+}
+
+mjx-container [size="Tn"] {
+  font-size: 60%;
+}
+
+mjx-container [size="sm"] {
+  font-size: 85%;
+}
+
+mjx-container [size="lg"] {
+  font-size: 120%;
+}
+
+mjx-container [size="Lg"] {
+  font-size: 144%;
+}
+
+mjx-container [size="LG"] {
+  font-size: 173%;
+}
+
+mjx-container [size="hg"] {
+  font-size: 207%;
+}
+
+mjx-container [size="HG"] {
+  font-size: 249%;
+}
+
+mjx-container [width="full"] {
+  width: 100%;
+}
+
+mjx-box {
+  display: inline-block;
+}
+
+mjx-block {
+  display: block;
+}
+
+mjx-itable {
+  display: inline-table;
+}
+
+mjx-row {
+  display: table-row;
+}
+
+mjx-row > * {
+  display: table-cell;
+}
+
+mjx-mtext {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-mstyle {
+  display: inline-block;
+}
+
+mjx-merror {
+  display: inline-block;
+  color: red;
+  background-color: yellow;
+}
+
+mjx-mphantom {
+  visibility: hidden;
+}
+
+_::-webkit-full-page-media, _:future, :root mjx-container {
+  will-change: opacity;
+}
+
+mjx-assistive-mml {
+  position: absolute !important;
+  top: 0px;
+  left: 0px;
+  clip: rect(1px, 1px, 1px, 1px);
+  padding: 1px 0px 0px 0px !important;
+  border: 0px !important;
+  display: block !important;
+  width: auto !important;
+  overflow: hidden !important;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+mjx-assistive-mml[display="block"] {
+  width: 100% !important;
+}
+
+mjx-math {
+  display: inline-block;
+  text-align: left;
+  line-height: 0;
+  text-indent: 0;
+  font-style: normal;
+  font-weight: normal;
+  font-size: 100%;
+  font-size-adjust: none;
+  letter-spacing: normal;
+  border-collapse: collapse;
+  word-wrap: normal;
+  word-spacing: normal;
+  white-space: nowrap;
+  direction: ltr;
+  padding: 1px 0;
+}
+
+mjx-container[jax="CHTML"][display="true"] {
+  display: block;
+  text-align: center;
+  margin: 1em 0;
+}
+
+mjx-container[jax="CHTML"][display="true"][width="full"] {
+  display: flex;
+}
+
+mjx-container[jax="CHTML"][display="true"] mjx-math {
+  padding: 0;
+}
+
+mjx-container[jax="CHTML"][justify="left"] {
+  text-align: left;
+}
+
+mjx-container[jax="CHTML"][justify="right"] {
+  text-align: right;
+}
+
+mjx-mfrac {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-frac {
+  display: inline-block;
+  vertical-align: 0.17em;
+  padding: 0 .22em;
+}
+
+mjx-frac[type="d"] {
+  vertical-align: .04em;
+}
+
+mjx-frac[delims] {
+  padding: 0 .1em;
+}
+
+mjx-frac[atop] {
+  padding: 0 .12em;
+}
+
+mjx-frac[atop][delims] {
+  padding: 0;
+}
+
+mjx-dtable {
+  display: inline-table;
+  width: 100%;
+}
+
+mjx-dtable > * {
+  font-size: 2000%;
+}
+
+mjx-dbox {
+  display: block;
+  font-size: 5%;
+}
+
+mjx-num {
+  display: block;
+  text-align: center;
+}
+
+mjx-den {
+  display: block;
+  text-align: center;
+}
+
+mjx-mfrac[bevelled] > mjx-num {
+  display: inline-block;
+}
+
+mjx-mfrac[bevelled] > mjx-den {
+  display: inline-block;
+}
+
+mjx-den[align="right"], mjx-num[align="right"] {
+  text-align: right;
+}
+
+mjx-den[align="left"], mjx-num[align="left"] {
+  text-align: left;
+}
+
+mjx-nstrut {
+  display: inline-block;
+  height: .054em;
+  width: 0;
+  vertical-align: -.054em;
+}
+
+mjx-nstrut[type="d"] {
+  height: .217em;
+  vertical-align: -.217em;
+}
+
+mjx-dstrut {
+  display: inline-block;
+  height: .505em;
+  width: 0;
+}
+
+mjx-dstrut[type="d"] {
+  height: .726em;
+}
+
+mjx-line {
+  display: block;
+  box-sizing: border-box;
+  min-height: 1px;
+  height: .06em;
+  border-top: .06em solid;
+  margin: .06em -.1em;
+  overflow: hidden;
+}
+
+mjx-line[type="d"] {
+  margin: .18em -.1em;
+}
+
+mjx-mrow {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-mn {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-c {
+  display: inline-block;
+}
+
+mjx-utext {
+  display: inline-block;
+  padding: .75em 0 .2em 0;
+}
+
+mjx-mi {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-msup {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-mo {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-stretchy-h {
+  display: inline-table;
+  width: 100%;
+}
+
+mjx-stretchy-h > * {
+  display: table-cell;
+  width: 0;
+}
+
+mjx-stretchy-h > * > mjx-c {
+  display: inline-block;
+  transform: scalex(1.0000001);
+}
+
+mjx-stretchy-h > * > mjx-c::before {
+  display: inline-block;
+  width: initial;
+}
+
+mjx-stretchy-h > mjx-ext {
+  /* IE */ overflow: hidden;
+  /* others */ overflow: clip visible;
+  width: 100%;
+}
+
+mjx-stretchy-h > mjx-ext > mjx-c::before {
+  transform: scalex(500);
+}
+
+mjx-stretchy-h > mjx-ext > mjx-c {
+  width: 0;
+}
+
+mjx-stretchy-h > mjx-beg > mjx-c {
+  margin-right: -.1em;
+}
+
+mjx-stretchy-h > mjx-end > mjx-c {
+  margin-left: -.1em;
+}
+
+mjx-stretchy-v {
+  display: inline-block;
+}
+
+mjx-stretchy-v > * {
+  display: block;
+}
+
+mjx-stretchy-v > mjx-beg {
+  height: 0;
+}
+
+mjx-stretchy-v > mjx-end > mjx-c {
+  display: block;
+}
+
+mjx-stretchy-v > * > mjx-c {
+  transform: scaley(1.0000001);
+  transform-origin: left center;
+  overflow: hidden;
+}
+
+mjx-stretchy-v > mjx-ext {
+  display: block;
+  height: 100%;
+  box-sizing: border-box;
+  border: 0px solid transparent;
+  /* IE */ overflow: hidden;
+  /* others */ overflow: visible clip;
+}
+
+mjx-stretchy-v > mjx-ext > mjx-c::before {
+  width: initial;
+  box-sizing: border-box;
+}
+
+mjx-stretchy-v > mjx-ext > mjx-c {
+  transform: scaleY(500) translateY(.075em);
+  overflow: visible;
+}
+
+mjx-mark {
+  display: inline-block;
+  height: 0px;
+}
+
+mjx-msub {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-TeXAtom {
+  display: inline-block;
+  text-align: left;
+}
+
+mjx-c::before {
+  display: block;
+  width: 0;
+}
+
+.MJX-TEX {
+  font-family: MJXZERO, MJXTEX;
+}
+
+.TEX-B {
+  font-family: MJXZERO, MJXTEX-B;
+}
+
+.TEX-I {
+  font-family: MJXZERO, MJXTEX-I;
+}
+
+.TEX-MI {
+  font-family: MJXZERO, MJXTEX-MI;
+}
+
+.TEX-BI {
+  font-family: MJXZERO, MJXTEX-BI;
+}
+
+.TEX-S1 {
+  font-family: MJXZERO, MJXTEX-S1;
+}
+
+.TEX-S2 {
+  font-family: MJXZERO, MJXTEX-S2;
+}
+
+.TEX-S3 {
+  font-family: MJXZERO, MJXTEX-S3;
+}
+
+.TEX-S4 {
+  font-family: MJXZERO, MJXTEX-S4;
+}
+
+.TEX-A {
+  font-family: MJXZERO, MJXTEX-A;
+}
+
+.TEX-C {
+  font-family: MJXZERO, MJXTEX-C;
+}
+
+.TEX-CB {
+  font-family: MJXZERO, MJXTEX-CB;
+}
+
+.TEX-FR {
+  font-family: MJXZERO, MJXTEX-FR;
+}
+
+.TEX-FRB {
+  font-family: MJXZERO, MJXTEX-FRB;
+}
+
+.TEX-SS {
+  font-family: MJXZERO, MJXTEX-SS;
+}
+
+.TEX-SSB {
+  font-family: MJXZERO, MJXTEX-SSB;
+}
+
+.TEX-SSI {
+  font-family: MJXZERO, MJXTEX-SSI;
+}
+
+.TEX-SC {
+  font-family: MJXZERO, MJXTEX-SC;
+}
+
+.TEX-T {
+  font-family: MJXZERO, MJXTEX-T;
+}
+
+.TEX-V {
+  font-family: MJXZERO, MJXTEX-V;
+}
+
+.TEX-VB {
+  font-family: MJXZERO, MJXTEX-VB;
+}
+
+mjx-stretchy-v mjx-c, mjx-stretchy-h mjx-c {
+  font-family: MJXZERO, MJXTEX-S1, MJXTEX-S4, MJXTEX, MJXTEX-A ! important;
+}
+
+@font-face /* 0 */ {
+  font-family: MJXZERO;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Zero.woff") format("woff");
+}
+
+@font-face /* 1 */ {
+  font-family: MJXTEX;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Main-Regular.woff") format("woff");
+}
+
+@font-face /* 2 */ {
+  font-family: MJXTEX-B;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Main-Bold.woff") format("woff");
+}
+
+@font-face /* 3 */ {
+  font-family: MJXTEX-I;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Math-Italic.woff") format("woff");
+}
+
+@font-face /* 4 */ {
+  font-family: MJXTEX-MI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Main-Italic.woff") format("woff");
+}
+
+@font-face /* 5 */ {
+  font-family: MJXTEX-BI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Math-BoldItalic.woff") format("woff");
+}
+
+@font-face /* 6 */ {
+  font-family: MJXTEX-S1;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size1-Regular.woff") format("woff");
+}
+
+@font-face /* 7 */ {
+  font-family: MJXTEX-S2;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size2-Regular.woff") format("woff");
+}
+
+@font-face /* 8 */ {
+  font-family: MJXTEX-S3;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size3-Regular.woff") format("woff");
+}
+
+@font-face /* 9 */ {
+  font-family: MJXTEX-S4;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Size4-Regular.woff") format("woff");
+}
+
+@font-face /* 10 */ {
+  font-family: MJXTEX-A;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_AMS-Regular.woff") format("woff");
+}
+
+@font-face /* 11 */ {
+  font-family: MJXTEX-C;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Calligraphic-Regular.woff") format("woff");
+}
+
+@font-face /* 12 */ {
+  font-family: MJXTEX-CB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Calligraphic-Bold.woff") format("woff");
+}
+
+@font-face /* 13 */ {
+  font-family: MJXTEX-FR;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Fraktur-Regular.woff") format("woff");
+}
+
+@font-face /* 14 */ {
+  font-family: MJXTEX-FRB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Fraktur-Bold.woff") format("woff");
+}
+
+@font-face /* 15 */ {
+  font-family: MJXTEX-SS;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Regular.woff") format("woff");
+}
+
+@font-face /* 16 */ {
+  font-family: MJXTEX-SSB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Bold.woff") format("woff");
+}
+
+@font-face /* 17 */ {
+  font-family: MJXTEX-SSI;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_SansSerif-Italic.woff") format("woff");
+}
+
+@font-face /* 18 */ {
+  font-family: MJXTEX-SC;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Script-Regular.woff") format("woff");
+}
+
+@font-face /* 19 */ {
+  font-family: MJXTEX-T;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Typewriter-Regular.woff") format("woff");
+}
+
+@font-face /* 20 */ {
+  font-family: MJXTEX-V;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Vector-Regular.woff") format("woff");
+}
+
+@font-face /* 21 */ {
+  font-family: MJXTEX-VB;
+  src: url("https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/output/chtml/fonts/woff-v2/MathJax_Vector-Bold.woff") format("woff");
+}
+
+mjx-c.mjx-c38::before {
+  padding: 0.666em 0.5em 0.022em 0;
+  content: "8";
+}
+
+mjx-c.mjx-c1D435.TEX-I::before {
+  padding: 0.683em 0.759em 0 0;
+  content: "B";
+}
+
+mjx-c.mjx-c1D437.TEX-I::before {
+  padding: 0.683em 0.828em 0 0;
+  content: "D";
+}
+
+mjx-c.mjx-c32::before {
+  padding: 0.666em 0.5em 0 0;
+  content: "2";
+}
+
+mjx-c.mjx-c39::before {
+  padding: 0.666em 0.5em 0.022em 0;
+  content: "9";
+}
+
+mjx-c.mjx-c2E::before {
+  padding: 0.12em 0.278em 0 0;
+  content: ".";
+}
+
+mjx-c.mjx-c1D452.TEX-I::before {
+  padding: 0.442em 0.466em 0.011em 0;
+  content: "e";
+}
+
+mjx-c.mjx-c31::before {
+  padding: 0.666em 0.5em 0 0;
+  content: "1";
+}
+
+mjx-c.mjx-c34::before {
+  padding: 0.677em 0.5em 0 0;
+  content: "4";
+}
+
+mjx-c.mjx-c3E::before {
+  padding: 0.54em 0.778em 0.04em 0;
+  content: ">";
+}
+
+mjx-c.mjx-c35::before {
+  padding: 0.666em 0.5em 0.022em 0;
+  content: "5";
+}
+
+mjx-c.mjx-c30::before {
+  padding: 0.666em 0.5em 0.022em 0;
+  content: "0";
+}
+
+mjx-c.mjx-c2243::before {
+  padding: 0.464em 0.778em 0 0;
+  content: "\2243";
+}
+
+mjx-c.mjx-c36::before {
+  padding: 0.666em 0.5em 0.022em 0;
+  content: "6";
+}
+
+mjx-c.mjx-c2C::before {
+  padding: 0.121em 0.278em 0.194em 0;
+  content: ",";
+}
+
+mjx-c.mjx-c6D::before {
+  padding: 0.442em 0.833em 0 0;
+  content: "m";
+}
+
+mjx-c.mjx-c61::before {
+  padding: 0.448em 0.5em 0.011em 0;
+  content: "a";
+}
+
+mjx-c.mjx-c78::before {
+  padding: 0.431em 0.528em 0 0;
+  content: "x";
+}
+
+mjx-c.mjx-c7B::before {
+  padding: 0.75em 0.5em 0.25em 0;
+  content: "{";
+}
+
+mjx-c.mjx-c1D447.TEX-I::before {
+  padding: 0.677em 0.704em 0 0;
+  content: "T";
+}
+
+mjx-c.mjx-c74::before {
+  padding: 0.615em 0.389em 0.01em 0;
+  content: "t";
+}
+
+mjx-c.mjx-c68::before {
+  padding: 0.694em 0.556em 0 0;
+  content: "h";
+}
+
+mjx-c.mjx-c63::before {
+  padding: 0.448em 0.444em 0.011em 0;
+  content: "c";
+}
+
+mjx-c.mjx-c6F::before {
+  padding: 0.448em 0.5em 0.01em 0;
+  content: "o";
+}
+
+mjx-c.mjx-c73::before {
+  padding: 0.448em 0.394em 0.011em 0;
+  content: "s";
+}
+
+mjx-c.mjx-c7D::before {
+  padding: 0.75em 0.5em 0.25em 0;
+  content: "}";
+}
+
+mjx-c.mjx-c3D::before {
+  padding: 0.583em 0.778em 0.082em 0;
+  content: "=";
+}
+
+mjx-c.mjx-c7B.TEX-S3::before {
+  padding: 1.45em 0.75em 0.949em 0;
+  content: "{";
+}
+
+mjx-c.mjx-c37::before {
+  padding: 0.676em 0.5em 0.022em 0;
+  content: "7";
+}
+
+mjx-c.mjx-c2B::before {
+  padding: 0.583em 0.778em 0.082em 0;
+  content: "+";
+}
+
+mjx-c.mjx-c22C5::before {
+  padding: 0.31em 0.278em 0 0;
+  content: "\22C5";
+}
+
+mjx-c.mjx-c33::before {
+  padding: 0.665em 0.5em 0.022em 0;
+  content: "3";
+}
+
+mjx-c.mjx-c7D.TEX-S3::before {
+  padding: 1.45em 0.75em 0.949em 0;
+  content: "}";
+}
+
+mjx-c.mjx-c1D439.TEX-I::before {
+  padding: 0.68em 0.749em 0 0;
+  content: "F";
+}
+</style><link crossorigin="anonymous" href="https://distill.pub/third-party/katex/katex.min.css" rel="stylesheet"/><script async="" src="https://distill.pub/third-party/katex/katex.min.js"></script></head>
+<body> <d-front-matter> <script async="" type="text/json">
+      {
+            "title": "如何理解TPU",
+            "description": "本节将全面介绍TPU的工作原理、它们如何通过网络连接以支持多芯片训练和推理，以及这些因素如何影响我们常用算法的性能。其中也有一些内容对GPU用户同样适用！",
+            "published": "February 04, 2025",
+            "authors": [
+              
+              {
+                "author": "Jacob Austin",
+                "authorURL": "https://www.jacobaustin.org/",
+                "affiliations": [
+                  {
+                    "name": "Google DeepMind",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Sholto Douglas",
+                "authorURL": "https://x.com/_sholtodouglas",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Roy Frostig",
+                "authorURL": "https://cs.stanford.edu/~rfrostig/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Anselm Levskaya",
+                "authorURL": "https://anselmlevskaya.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Charlie Chen",
+                "authorURL": "https://x.com/charliexychen",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Sharad Vikram",
+                "authorURL": "https://sharadvikram.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Federico Lebron",
+                "authorURL": "https://fedelebron.com/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Peter Choy",
+                "authorURL": "https://x.com/pchoy95",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Vinay Ramasesh",
+                "authorURL": "https://x.com/vinayramasesh",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Albert Webson",
+                "authorURL": "https://representation.ai/",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              },
+              
+              {
+                "author": "Reiner Pope<sup>*</sup>",
+                "authorURL": "https://x.com/reinerpope",
+                "affiliations": [
+                  {
+                    "name": "",
+                    "url": ""
+                  }
+                ]
+              }
+              
+            ],
+            "katex": {
+              "delimiters": [
+                {
+                  "left": "$",
+                  "right": "$",
+                  "display": false
+                },
+                {
+                  "left": "$$",
+                  "right": "$$",
+                  "display": true
+                }
+              ]
+            }
+          }
+    </script> </d-front-matter> <header> <script>
+    function goToTop() {
+      document.body.scrollTop = 0; // For Safari
+      document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+    }
+
+    // When the user scrolls down 20px from the top of the document, show the button
+    window.onscroll = function() {scrollFunction()};
+
+    function scrollFunction() {
+      // Get the button:
+      let mybutton = document.getElementById("top-button");
+
+      if (document.body.scrollTop > 40 || document.documentElement.scrollTop > 40) {
+        mybutton.style.display = "block";
+      } else {
+        mybutton.style.display = "none";
+      }
+  }
+  </script> <nav class="navbar navbar-light navbar-expand-sm fixed-top" id="navbar" role="navigation"> <div class="container"> <a class="navbar-brand title font-weight-lighter" href="scaling-book.html"> 如何扩展你的模型 </a> <button aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler collapsed ml-auto" data-target="#navbarNav" data-toggle="collapse" type="button"> <span class="sr-only">切换导航</span> <span class="icon-bar top-bar"></span> <span class="icon-bar middle-bar"></span> <span class="icon-bar bottom-bar"></span> </button> <div class="left-button section-button"><a href="roofline.html"><svg viewbox="-78.5 0 512 512"><path d="M257 64L291 98 128 262 291 426 257 460 61 262 257 64Z"></path></svg></a></div> <div class="right-button section-button"><a href="sharding.html"><svg viewbox="-78.5 0 512 512"><path d="M98 460L64 426 227 262 64 98 98 64 294 262 98 460Z"></path></svg></a></div> <div class="collapse navbar-collapse text-right" id="navbarNav"> <ul class="navbar-nav ml-auto flex-nowrap"> <li class="nav-item"> <a class="nav-link" href="scaling-book.html"> </a> </li> <li class="nav-item nav-hidden"><a class="nav-link" id="top-button" onclick="goToTop()" style="display: none;">返回顶部</a></li> <li class="nav-item nav-hidden"><p class="nav-link"></p></li> <li class="nav-item nav-hidden"><a class="nav-link" href="roofline.html">上一部分</a></li> <li class="nav-item nav-hidden"><a class="nav-link" href="sharding.html">下一部分</a></li> <li class="nav-item nav-hidden"><p class="nav-link"></p></li> <li class="nav-item dropdown"> <a aria-expanded="false" aria-haspopup="true" class="nav-link dropdown-toggle" data-toggle="dropdown" href="#" id="navbarDropdown" role="button">章节 </a> <div aria-labelledby="navbarDropdown" class="dropdown-menu dropdown-menu-right"> <a class="dropdown-item" href="https://jax-ml.github.io/scaling-book/index">第0部分. 引言</a> <a class="dropdown-item" href="roofline.html">第1部分. 屋顶线模型入门</a> <a class="dropdown-item" href="tpus.html">第2部分. 全面了解TPU</a> <a class="dropdown-item" href="sharding.html">第3部分. 分片矩阵乘法</a> <a class="dropdown-item" href="transformers.html">第4部分. Transformer</a> <a class="dropdown-item" href="training.html">第5部分. 训练</a> <a class="dropdown-item" href="applied-training.html">第6部分. 训练LLaMA</a> <a class="dropdown-item" href="inference.html">第7部分. 推理</a> <a class="dropdown-item" href="applied-inference.html">第8部分. 部署LLaMA</a> <a class="dropdown-item" href="profiling.html">第9部分. 性能分析</a> <a class="dropdown-item" href="jax-stuff.html">第10部分. 全面了解JAX</a> <a class="dropdown-item" href="conclusion.html">第11部分. 结论</a> <a class="dropdown-item" href="gpus.html">第12部分. GPU</a> </div> </li> <li class="toggle-container"> <button id="light-toggle" title="Change theme"> <i class="ti ti-sun-moon" id="light-toggle-system"></i> <i class="ti ti-moon-filled" id="light-toggle-dark"></i> <i class="ti ti-sun-filled" id="light-toggle-light"></i> </button> </li> </ul> </div> </div> </nav> <progress id="progress" value="0"> <div class="progress-container"> <span class="progress-bar"></span> </div> </progress> </header> <div class="post distill"><div class="translation-info base-grid" style="margin-bottom: 20px;">
+<div style="grid-column: text;
+                       display: flex;
+                       align-items: center;
+                       justify-content: space-between;
+                       padding: 16px 0;
+                       border-bottom: 1px solid var(--global-text-color-light, rgba(0,0,0,0.15));
+                       font-size: 16px;
+                       line-height: 1.5;
+                       color: var(--global-text-color, currentColor);">
+<div style="display: flex;
+                           flex-direction: column;
+                           gap: 8px;">
+<div>
+<span style="font-weight: 600; color: var(--global-text-color, currentColor);">🔗 英文原文：</span>
+<a href="https://jax-ml.github.io/scaling-book/tpus/" onmouseout="this.style.textDecoration='none'" onmouseover="this.style.textDecoration='underline'" rel="noopener noreferrer" style="color: var(--global-theme-color, #004276);
+                                  text-decoration: none;
+                                  margin-left: 4px;" target="_blank">
+                           https://jax-ml.github.io/scaling-book/tpus/
+                        </a>
+</div>
+<div>
+<span style="font-weight: 600; color: var(--global-text-color, currentColor);">✍️ 翻译：</span>
+<span style="margin-left: 4px; color: var(--global-text-color, currentColor);">北极的树</span>
+</div>
+</div>
+<div style="flex-shrink: 0;
+                           display: flex;
+                           flex-direction: column;
+                           align-items: center;
+                           gap: 6px;
+                           margin-left: 20px;">
+<img alt="微信二维码" loading="lazy" src="https://wechat-account-1251781786.cos.ap-guangzhou.myqcloud.com/wechat_account.jpeg" style="width: 80px;
+                                height: 80px;
+                                border-radius: 6px;
+                                opacity: 0.9;"/>
+<span style="font-size: 12px;
+                                 color: var(--global-text-color-light, currentColor);
+                                 opacity: 0.8;
+                                 text-align: center;">
+                        微信公众号
+                    </span>
+</div>
+</div>
+</div> <d-title> <h1>如何理解TPU</h1> <p>《如何扩展你的模型》第2部分 (<a href="roofline.html">第1部分：屋顶线模型</a> | <a href="sharding.html">第3部分：分片</a>)</p> <p>本节将全面介绍TPU的工作原理、它们如何通过网络连接以支持多芯片训练和推理，以及这些因素如何影响我们常用算法的性能。其中也有一些内容对GPU用户同样适用！</p> </d-title> <d-byline>
+<div class="byline grid">
+<div class="authors-affiliations grid">
+<h3 style="grid-column: 1; grid-row: 1;">作者</h3>
+<h3></h3>
+<h3>所属机构</h3>
+<p class="author" style="grid-column: 1; grid-row: 2;">
+<a class="name" href="https://www.jacobaustin.org/">Jacob Austin</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 2;">
+<span class="affiliation">Google DeepMind</span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 3;">
+<a class="name" href="https://x.com/_sholtodouglas">Sholto Douglas</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 3;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 4;">
+<a class="name" href="https://cs.stanford.edu/~rfrostig/">Roy Frostig</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 4;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 5;">
+<a class="name" href="https://anselmlevskaya.com/">Anselm Levskaya</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 5;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 6;">
+<a class="name" href="https://x.com/charliexychen">Charlie Chen</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 6;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 1; grid-row: 7;">
+<a class="name" href="https://sharadvikram.com/">Sharad Vikram</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 7;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 2;">
+<a class="name" href="https://fedelebron.com/">Federico Lebron</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 2;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 3;">
+<a class="name" href="https://x.com/pchoy95">Peter Choy</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 3;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 4;">
+<a class="name" href="https://x.com/vinayramasesh">Vinay Ramasesh</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 4;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 5;">
+<a class="name" href="https://representation.ai/">Albert Webson</a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 5;">
+<span class="affiliation"></span>
+</p>
+<p class="author" style="grid-column: 2; grid-row: 6;">
+<a class="name" href="https://x.com/reinerpope">Reiner Pope<sup>*</sup></a>
+</p>
+<p class="affiliation" style="grid-column: 3; grid-row: 6;">
+<span class="affiliation"></span>
+</p>
+</div>
+<div>
+<h3>发布日期</h3>
+<p>2025年2月4日</p>
+</div>
+</div>
+</d-byline> <d-article> <d-contents> <nav class="l-text figcaption"> <h3>目录</h3> <div> <a href="#what-is-a-tpu">什么是TPU？</a> </div> <div> <a href="#tpu-networking">TPU网络</a> </div> <div> <a href="#key-takeaways">核心要点</a> </div> <div> <a href="#"></a> </div> <ul> <li> <a href="#tpu-specs">TPU规格</a> </li> </ul> <div> <a href="#worked-problems">练习题</a> </div> <div> <a href="#appendix">附录</a> </div> <div> <a href="#"></a> </div> <ul> <li> <a href="#appendix-a-more-on-tpu-internals">附录A：更多关于TPU内部的细节</a> </li> <li> <a href="#appendix-b-how-does-a-systolic-array-work">附录B：脉动阵列是如何工作的？</a> </li> </ul> </nav> </d-contents> <p class="announce">您可能也会对关于NVIDIA GPU的新增<a href="gpus.html">第12节</a>感兴趣！</p> <h2 id="what-is-a-tpu">什么是TPU？</h2> <p><strong>TPU本质上是一个专门用于矩阵乘法（称为TensorCore）的计算核心，附带一组高速内存（称为高带宽内存或HBM）<d-cite key="tpu_paper"></d-cite>。</strong> 下图是一个示意图：</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/tpu-chip-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/tpu-chip-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/tpu-chip-1400.webp 1400w" type="image/webp"/> <img class="img-fluid" height="514" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/tpu-chip.png" width="1026"/> </picture> <figcaption class="caption"><b>图：</b>TPU芯片的基本组件。灰色的左侧方框是TensorCore，包含矩阵乘法单元（MXU）、向量单元（VPU）和向量内存（VMEM）。</figcaption> </figure> <p>你可以将TensorCore看作一台性能极佳的矩阵乘法机器，但它也有一些其他值得注意的功能。TensorCore有三个关键单元：</p> <ul> <li><strong>MXU</strong>（矩阵乘法单元）是TensorCore的核心。对于大多数TPU代际，它使用脉动阵列（详见<a href="#appendix-b-how-does-a-systolic-array-work">附录B</a>）每8个周期执行一次 <code class="language-plaintext highlighter-rouge">bfloat16[8,128] @ bf16[128,128] -&gt; f32[8,128]</code> 矩阵乘法<d-footnote id="d-footnote-1">TPU v6e (Trillium) 有一个256x256的MXU，而之前所有代际都使用128x128</d-footnote>。 <ul> <li>在TPU v5e上，这大约是每个MXU 1.5GHz时 <code class="language-plaintext highlighter-rouge">5e13</code> bfloat16 FLOPs/s。大多数TensorCore有2或4个MXU，因此例如TPU v5e的总bfloat16 FLOPs/s为 <code class="language-plaintext highlighter-rouge">2e14</code>。</li> <li>TPU也支持更高吞吐量的低精度矩阵乘法（例如，每个TPU v5e芯片可以达到 <code class="language-plaintext highlighter-rouge">4e14</code> int8 OPs/s）。</li> </ul> </li> <li><strong>VPU</strong>（向量处理单元）执行通用的数学运算，如ReLU激活函数或向量间的逐点加法或乘法。归约（求和）也在这里执行。<a href="#appendix-a-more-on-tpu-internals">附录A</a>提供了更多细节。</li> <li> <strong>VMEM</strong>（向量内存）是位于TensorCore内部、靠近计算单元的片上暂存区。它比HBM小得多（例如，TPU v5e上为128 MiB），但与MXU之间有更高的带宽。VMEM的运作方式有点像CPU上的L1/L2缓存，但容量更大且由程序员控制。HBM中的数据需要先复制到VMEM中，TensorCore才能对其进行计算。</li> </ul> <p><strong>TPU在矩阵乘法方面非常非常快</strong>。这基本上是它们的主要工作，而且做得很好。<a href="https://cloud.google.com/tpu/docs/v5p#system_architecture" rel="external nofollow noopener" target="_blank">TPU v5p</a>是迄今为止最强大的TPU之一，每个核心每秒可以执行 <code class="language-plaintext highlighter-rouge">2.5e14</code> bfloat16 FLOPs，或者说每个芯片每秒 <code class="language-plaintext highlighter-rouge">5e14</code> bfloat16 FLOPs。一个包含8960个芯片的Pod每秒可以执行4 exaflops。这<em>非常</em>多。这是世界上最强大的超级计算机之一。而Google拥有很多这样的机器。<d-footnote id="d-footnote-2">TPU，特别是其脉动阵列，之所以是如此强大的硬件加速器，是因为矩阵乘法是少数几个使用 <d-math>O(n^3)</d-math> 计算量处理 <d-math>O(n^2)</d-math> 字节数据的算法之一。这使得普通的ALU很容易受计算而非内存带宽的限制。</d-footnote></p> <p>上图还包括一些其他组件，如SMEM和标量单元，它们用于处理控制流，在<a href="#appendix-a-more-on-tpu-internals">附录A</a>中有简要讨论，但理解它们并非至关重要。另一方面，HBM很重要且相当简单：</p> <ul> <li> <p><strong>HBM</strong>（高带宽内存）是一大块高速内存，用于存储供TensorCore使用的张量。HBM的容量通常在几十GB的量级（例如，<a href="https://cloud.google.com/tpu/docs/v5e#system_architecture" rel="external nofollow noopener" target="_blank">TPU v5e拥有16GiB的HBM</a>）。</p> <ul> <li> <p>当计算需要时，张量会通过VMEM（见下文）从HBM流式传输到MXU，结果再从VMEM写回HBM。</p> </li> <li> <p>HBM和TensorCore之间的带宽（通过VMEM）被称为“HBM带宽”（通常在1-2TB/秒左右），它限制了内存密集型工作负载的计算速度。</p> </li> </ul> </li> </ul> <p><strong>通常，所有TPU操作都是流水线化和重叠的。</strong>为了执行一次矩阵乘法 <d-math>X \cdot A \to Y</d-math>，TPU首先需要将矩阵 <d-math>A</d-math> 和 <d-math>X</d-math> 的块从HBM复制到VMEM，然后将它们加载到MXU中，MXU会乘以8x128（对于<d-math>X</d-math>）和128x128（对于<d-math>A</d-math>）的块，然后将结果逐块复制回HBM。为了高效地完成这个过程，矩阵乘法是流水线化的，这样与VMEM之间的数据复制就可以与MXU的工作重叠。这使得MXU可以持续工作，而不是等待内存传输，从而使矩阵乘法受计算限制，而非内存限制。</p> <p>这是一个从HBM执行逐元素乘法的例子：</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/pointwise-product-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/pointwise-product-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/pointwise-product-1400.webp 1400w" type="image/webp"/> <img height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/pointwise-product.gif" width="100%"/> </picture> <figcaption class="caption"><b>图：</b>一个动画展示了在TPU上执行的逐点乘法，字节从HBM加载。注意字节是如何以块的形式从内存中流出的，以及部分结果是如何在不等待整个数组物化的情况下流水线式地回传的。</figcaption> </figure> <p>一次矩阵乘法看起来几乎完全相同，只是它会加载到MXU而不是VPU/向量单元，并且加载和存储的顺序会不同，因为同一个权重块会用于多个激活块。你可以看到数据块流向VMEM，然后进入VREGs（向量寄存器），接着进入向量单元，最后回到VMEM和HBM。我们马上会看到，如果从HBM到VMEM的加载速度慢于向量单元（或MXU）的FLOPs，我们就会变得“带宽受限”，因为VPU或MXU会因缺少数据而空闲。</p> <p class="takeaway"><strong>核心要点：</strong>TPU非常简单。它们将权重从HBM加载到VMEM，然后从VMEM加载到一个脉动阵列中，该阵列每秒可以执行约200万亿次乘加运算。HBM <d-math>\leftrightarrow</d-math> VMEM和VMEM <d-math>\leftrightarrow</d-math> 脉动阵列的带宽对TPU能高效执行哪些计算设定了基本限制。</p> <p><strong>VMEM和计算强度：</strong>VMEM比HBM小得多，但它与MXU之间的带宽要高得多。正如我们在<a href="roofline.html">第1节</a>中看到的，这意味着如果一个算法能将其所有输入/输出都放入VMEM，它就更不容易遇到通信瓶颈。当一个计算的计算强度较低时，这一点尤其有用：VMEM带宽大约是HBM带宽的22倍，这意味着一个从VMEM读取/写入的MXU操作只需要10-20的计算强度就能达到峰值FLOPs利用率。这意味着如果我们能将权重放入VMEM而不是HBM，我们的矩阵乘法可以在小得多的批量大小下达到计算限制。这也意味着那些计算强度天生较低的算法仍然可以是高效的。只是VMEM太小了，这常常是一个挑战。<d-footnote id="d-footnote-3">我们有时会谈到VMEM预取，指的是提前在VMEM中加载权重，这样我们就可以掩盖矩阵乘法的加载成本。例如，在标准的Transformer中，我们有时可以在注意力计算期间将大的前馈网络权重加载到VMEM中，如果我们的内存带宽受限，这可以隐藏权重加载的成本。这要求我们的权重足够小或分片得足够细，以便能将单层权重放入VMEM并留有余地。</d-footnote></p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/tpu-bandwidth-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/tpu-bandwidth-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/tpu-bandwidth-1400.webp 1400w" type="image/webp"/> <img class="img-fluid" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/tpu-bandwidth.png" width="100%"/> </picture> </figure> <p><strong>一个TPU芯片通常（但并非总是）由两个TPU核心组成，它们共享内存，可以被看作一个拥有两倍FLOPs的大型加速器</strong>（称为“megacore”配置）。自TPU v4以来都是如此。较早的TPU芯片有独立的内存，被视为两个独立的加速器（TPU v3及更早版本）。像TPU v5e这样为推理优化的芯片每个芯片只有一个TPU核心。</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/cores-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/cores-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/cores-1400.webp 1400w" type="image/webp"/> <img class="img-fluid img-small" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/cores.png" width="100%"/> </picture> </figure> <p><strong>芯片</strong>以<strong>4个一组的形式排列在“托盘”上</strong>，通过<strong>PCIe网络连接到一个CPU主机。</strong>这是大多数读者会熟悉的形式，即通过Colab或单个TPU-VM暴露的4个芯片（8个核心，但通常被视为4个逻辑megacore）。对于像TPU v5e这样的推理芯片，每个主机有2个托盘，而不是1个，但每个芯片也只有一个核心，因此我们有8个芯片 = 8个核心。<d-footnote id="d-footnote-4">在Cloud TPU VM上，每个托盘都作为独立VM的一部分暴露出来，因此再次可见4个核心。</d-footnote></p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/pcie-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/pcie-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/pcie-1400.webp 1400w" type="image/webp"/> <img class="img-fluid" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/pcie.png" width="100%"/> </picture> </figure> <p><strong>PCIe带宽是有限的：</strong>与HBM <d-math>\leftrightarrow</d-math> VMEM链路一样，CPU <d-math>\leftrightarrow</d-math> HBM的PCIe连接有特定的带宽，这限制了你从主机内存加载到HBM或反之的速度。例如，TPU v4的PCIe带宽是单向16GB/秒，所以比HBM慢了近100倍。我们<em>可以</em>将数据加载/卸载到主机（CPU）RAM中，但速度不是很快。</p> <h2 id="tpu-networking">TPU网络</h2> <p><strong>在一个Pod中，芯片通过ICI网络相互连接</strong>。在较早的代际（TPU v2和TPU v3）、推理芯片（例如TPU v5e）和Trilium（TPU v6e）中，ICI（“芯片间互连”）连接4个最近的邻居（带有环绕链路以形成2D环面）。TPU v4和TPU v5p连接到最近的6个邻居（形成3D环面）。请注意，这些连接<strong>不</strong>通过它们的主机，而是芯片之间的直接链路。</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/ici-wraparound-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/ici-wraparound-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/ici-wraparound-1400.webp 1400w" type="image/webp"/> <img class="img-fluid img-small" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/ici-wraparound.png" width="100%"/> </picture> </figure> <p>环面结构将任意两个节点之间的最大距离从<d-math>N</d-math>减少到<d-math>N / 2</d-math>，使得通信快得多。TPU还有一种“扭曲环面”配置，它以类似莫比乌斯带的拓扑结构包裹环面，以进一步减小节点间的平均距离。</p> <p><strong>TPU pod（通过ICI连接）可以变得非常大：</strong>最大的pod大小（称为<strong>superpod</strong>）对于TPU v4是 <code class="language-plaintext highlighter-rouge">16x16x16</code>，对于TPU v5p是 <code class="language-plaintext highlighter-rouge">16x20x28</code>。这些大型pod由可重构的 <code class="language-plaintext highlighter-rouge">4x4x4</code> 芯片立方体组成，通过<a href="https://arxiv.org/pdf/2208.10041" rel="external nofollow noopener" target="_blank">光学环绕链路</a>连接<d-footnote id="d-footnote-5">光学开关只是一个具有相同ICI带宽的可重构连接。它只是让我们在连接立方体的同时保留环绕链路。</d-footnote>，我们可以重新配置它们以连接非常大的拓扑。</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/tpu-rack-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/tpu-rack-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/tpu-rack-1400.webp 1400w" type="image/webp"/> <img class="img-fluid" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/tpu-rack.png" width="100%"/> </picture> </figure> <p>也可以请求较小的拓扑（例如<code class="language-plaintext highlighter-rouge">2x2x1</code>, <code class="language-plaintext highlighter-rouge">2x2x2</code>），但没有环绕连接。这是一个重要的注意事项，因为它通常会使大多数通信时间加倍。任何完整立方体的倍数（例如<code class="language-plaintext highlighter-rouge">4x4x4</code>或<code class="language-plaintext highlighter-rouge">4x4x8</code>）都将由光开关提供环绕连接。<d-footnote id="d-footnote-6">请注意，一个 `2x2x4` 不会有任何环绕连接，因为它们是由光开关提供的，而光开关只在完整的立方体上可用。然而，一个TPU v5e 8x16 _将_在较长的轴上有环绕连接，因为它不使用可重构的光网络。</d-footnote></p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/subslices-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/subslices-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/subslices-1400.webp 1400w" type="image/webp"/> <img class="img-fluid" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/subslices.png" width="100%"/> </picture> </figure> <p>TPU v5e和Trillium pod由单个 <code class="language-plaintext highlighter-rouge">16x16</code> 2D环面组成，在任何大小为16的轴上都有环绕连接（这意味着一个 <code class="language-plaintext highlighter-rouge">8x16</code> 在长轴上有环绕连接）。TPU v5e和v6e（Trillium）不能扩展到超过16x16的环面，但pod之间仍然可以通过标准的数据中心网络（DCN）进行通信，DCN连接TPU主机。同样，可以请求没有环绕连接的较小拓扑，其维度<d-math>&lt;16</d-math>。</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/more-subslices-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/more-subslices-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/more-subslices-1400.webp 1400w" type="image/webp"/> <img class="img-fluid" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/more-subslices.png" width="100%"/> </picture> </figure> <p><strong>这种最近邻连接是TPU和GPU之间的一个关键区别</strong>。GPU通过一个分层的交换机网络连接，近似于每个GPU之间的点对点连接，而不是像TPU那样使用局部连接。通常，一个节点内的GPU（H100为8个GPU，B200多达500个）是直接连接的，而更大的拓扑则需要在每个GPU之间进行O(log(N))次跳跃。一方面，这意味着GPU可以在一个节点内以单次低延迟跳跃发送任意数据。另一方面，TPU的成本要低得多（因为NVLink交换机很昂贵），布线更简单，并且可以扩展到更大的拓扑，因为每个设备的链路数和每个设备的带宽是恒定的。在此处阅读更多信息<a href="https://jax-ml.github.io/scaling-book/gpus#networking">here</a>。</p> <p><strong>ICI相对于DCN非常快，但仍比HBM带宽慢。</strong>例如，一个<a href="https://cloud.google.com/tpu/docs/v5p#system_architecture" rel="external nofollow noopener" target="_blank">TPU v5p</a>具有：</p> <ul> <li> 每个芯片 <code class="language-plaintext highlighter-rouge">2.5e12</code> 字节/秒 (2.5 TB/s) 的HBM带宽。</li> <li> 每个轴 <code class="language-plaintext highlighter-rouge">9e10</code> 字节/秒 (90 GB/s) 的ICI带宽，每个芯片有3个轴。<d-footnote id="d-footnote-7">上述页面列出的带宽为100 GB/s，与此处列出的略有不同。TPU ICI链路的带宽根据执行的操作略有不同。你通常可以放心使用本文档中的数字。</d-footnote> </li> <li> 每个TPU <code class="language-plaintext highlighter-rouge">6.25e9</code> 字节/秒 (6.25 GB/s) 的DCN（出口）带宽（通过每个主机上的1-2个NIC）。<d-footnote id="d-footnote-8">TPU v6e为12.5e9字节/秒，v5e为3.125e9字节/秒。</d-footnote> </li> </ul> <p>这意味着当我们在多个芯片上分割模型时，需要小心避免因较慢的跨设备通信而使MXU成为瓶颈。</p> <p><strong>多slice训练：</strong>一组通过ICI连接的TPU称为一个<strong>slice</strong>。不同的slice之间可以通过DCN连接，例如连接不同pod上的slice。由于DCN是比ICI慢得多的连接，我们应该尽量限制计算等待来自DCN数据的时间。DCN是主机到主机的，因此要通过DCN将缓冲区从一个TPU传输到另一个TPU，我们首先需要通过PCIe传输到主机，然后通过网络出口，再通过目标主机的网络入口，最后通过PCIe进入HBM。</p> <h2 id="key-takeaways">核心要点</h2> <ul> <li> <p>TPU很简单，在大多数情况下可以被看作一个矩阵乘法单元，它连接到内存（超快）、通过ICI连接到其他芯片（相当快），以及通过DCN连接到数据中心的其他部分（速度尚可）。</p> </li> <li>通信受限于我们各种网络带宽，按速度排序： <ul> <li>HBM带宽：在TensorCore与其关联的HBM之间。</li> <li>ICI带宽：在一个TPU芯片与其最近的4或6个邻居之间。</li> <li>PCIe带宽：在一个CPU主机与其关联的芯片托盘之间。</li> <li>DCN带宽：在多个CPU主机之间，通常是未通过ICI连接的主机。</li> </ul> </li> <li> <p><strong>在一个slice内部，TPU仅通过ICI连接到其最近的邻居。</strong>这意味着在一个slice内，远距离芯片之间的ICI通信需要先跳过中间的芯片。</p> </li> <li> <p><strong>权重矩阵在两个维度上都需要填充到至少128的大小</strong>（在TPU v6上是256），以填满MXU（实际上，较小的轴会被填充到128）。</p> </li> <li> <p><strong>较低精度的矩阵乘法通常更快。</strong>对于支持它的代际，TPU执行int8或int4 FLOPs的速度大约是bfloat16 FLOPs的2倍/4倍。VPU操作仍然以fp32执行。</p> </li> <li>为了避免TPU计算单元成为瓶颈，我们需要<strong>确保每个通道上的通信量与其速度成比例</strong>。</li> </ul> <h3 id="tpu-specs">TPU规格</h3> <p>以下是我们芯片的一些具体数字：</p> <table class="table-hover" data-toggle="table"> <thead> <tr> <th style="text-align: left">型号</th> <th style="text-align: center">Pod大小</th> <th style="text-align: center">主机大小</th> <th style="text-align: center">HBM容量/芯片</th> <th style="text-align: center">HBM带宽/芯片 (字节/秒)</th> <th style="text-align: center">FLOPs/秒/芯片 (bf16)</th> <th style="text-align: center">FLOPs/秒/芯片 (int8)</th> </tr> </thead> <tbody> <tr> <td style="text-align: left"><span class="nowrap-header">TPU v3</span></td> <td style="text-align: center">32x32</td> <td style="text-align: center">4x2</td> <td style="text-align: center">32GB</td> <td style="text-align: center">9.0e11</td> <td style="text-align: center">1.4e14</td> <td style="text-align: center">1.4e14</td> </tr> <tr> <td style="text-align: left"><span class="nowrap-header">TPU v4p</span></td> <td style="text-align: center">16x16x16</td> <td style="text-align: center">2x2x1</td> <td style="text-align: center">32GB</td> <td style="text-align: center">1.2e12</td> <td style="text-align: center">2.75e14</td> <td style="text-align: center">2.75e14</td> </tr> <tr> <td style="text-align: left"><span class="nowrap-header">TPU v5p</span></td> <td style="text-align: center">16x20x28</td> <td style="text-align: center">2x2x1</td> <td style="text-align: center">96GB</td> <td style="text-align: center">2.8e12</td> <td style="text-align: center">4.59e14</td> <td style="text-align: center">9.18e14</td> </tr> <tr> <td style="text-align: left"><span class="nowrap-header">TPU v5e</span></td> <td style="text-align: center">16x16</td> <td style="text-align: center">4x2</td> <td style="text-align: center">16GB</td> <td style="text-align: center">8.1e11</td> <td style="text-align: center">1.97e14</td> <td style="text-align: center">3.94e14</td> </tr> <tr> <td style="text-align: left"><span class="nowrap-header">TPU v6e</span></td> <td style="text-align: center">16x16</td> <td style="text-align: center">4x2</td> <td style="text-align: center">32GB</td> <td style="text-align: center">1.6e12</td> <td style="text-align: center">9.20e14</td> <td style="text-align: center">1.84e15</td> </tr> </tbody> </table> <p>主机大小指的是连接到单个主机的TPU拓扑（例如，TPU v5e有一个CPU主机连接到8个呈4x2拓扑的TPU）。以下是互连数据：</p> <table class="table-hover" data-toggle="table"> <thead> <tr> <th style="text-align: left">型号</th> <th style="text-align: center">ICI带宽/链路 (单向, 字节/秒)</th> <th style="text-align: center">ICI带宽/链路 (双向, 字节/秒)</th> </tr> </thead> <tbody> <tr> <td style="text-align: left"><strong>TPU v3</strong></td> <td style="text-align: center">1e11</td> <td style="text-align: center">2e11</td> </tr> <tr> <td style="text-align: left"><strong>TPU v4p</strong></td> <td style="text-align: center">4.5e10</td> <td style="text-align: center">9e10</td> </tr> <tr> <td style="text-align: left"><strong>TPU v5p</strong></td> <td style="text-align: center">9e10</td> <td style="text-align: center">1.8e11</td> </tr> <tr> <td style="text-align: left"><strong>TPU v5e</strong></td> <td style="text-align: center">4.5e10</td> <td style="text-align: center">9e10</td> </tr> <tr> <td style="text-align: left"><strong>TPU v6e</strong></td> <td style="text-align: center">9e10</td> <td style="text-align: center">1.8e11</td> </tr> </tbody> </table> <p>我们同时提供了单向（unidirectional）带宽和双向（bidirectional）带宽，因为单向带宽更接近硬件实际情况，但双向带宽在涉及完整环形网络的方程中更常出现。<d-footnote id="d-footnote-9">我们所说的双向（bidi）带宽是指单个链路上双向可发送的总字节数，或者等同于，假设我们可以高效地使用两个链路，单个TPU沿特定轴的总出向字节数。当我们有一个功能正常的环形网络时，即当我们在特定轴上有环绕连接时，这是成立的。这在推理芯片上当我们有一个完整的16轴时发生，或者在训练芯片（v*p）上当我们有一个是4的倍数的轴时发生。我们更喜欢使用双向带宽，因为它在涉及双向通信的计算中频繁出现。</d-footnote></p> <p>PCIe带宽通常约为每个TPU <code class="language-plaintext highlighter-rouge">1.6e10</code> 字节/秒（TPU v6e为 <code class="language-plaintext highlighter-rouge">3.2e10</code>），而DCN带宽通常约为每个TPU <code class="language-plaintext highlighter-rouge">6.25e9</code> 字节/秒（TPU v6e为 <code class="language-plaintext highlighter-rouge">12.5e9</code>，TPU v5e为 <code class="language-plaintext highlighter-rouge">3.125e9</code>）。</p> <h2 id="worked-problems">练习题</h2> <p>这些数字可能有些枯燥，但它们能让你对模型性能做出基本的屋顶线估算。让我们通过几个问题来解释为什么这很有用。你将在第3部分看到更多例子。</p> <p><strong>问题1 [LLM延迟的界定]：</strong>假设你想从一个分布在32个TPU v4p上的200B参数的bf16模型中进行采样。将所有参数从HBM加载到脉动阵列需要多长时间？<em>提示：使用上面的数字。</em></p> <details><summary>点击此处查看答案。</summary> <p><strong>答案：</strong>我们在32个芯片上加载 <code class="language-plaintext highlighter-rouge">sizeof(bf16) * 200e9 = 400e9</code> 字节，即每个芯片12.5e9字节，每个芯片的HBM带宽为1.23e12。所以加载大约需要10毫秒。</p> <p>这很酷，因为<em>这是对模型采样延迟的一个合理的下界</em>。每个采样步骤都需要从HBM加载所有参数，所以耗时不可能少于10毫秒。实际上，在小批量大小下，这几乎是可以实现的。</p> </details> <p><strong>问题2 [TPU细节]：</strong>考虑一个完整的TPU v5e pod。总共有多少个CPU主机？多少个TPU TensorCore？整个pod的总FLOPs/s是多少？总HBM是多少？对TPU v5p pod做同样的练习。</p> <details><summary>点击此处查看答案。</summary> <p><strong>答案：</strong>对于TPU v5e，每个pod是 <code class="language-plaintext highlighter-rouge">16x16</code>，每个主机是一个4x2的slice，所以我们有 <code class="language-plaintext highlighter-rouge">16*16 / 8 = 32</code> 个主机。对于TPU v5e，每个TPU只有一个核心，所以我们有256个TensorCore。总FLOPs/s是 <code class="language-plaintext highlighter-rouge">16*16*2e14 = 5.1e16</code> bfloat16。每个芯片有16GB的HBM，所以总内存是 <code class="language-plaintext highlighter-rouge">256 * 16 = 4TB</code>。</p> <p>对于一个完整的TPU v5p pod，我们有 <code class="language-plaintext highlighter-rouge">16x20x28</code> 个芯片，每个主机是2x2x1，所以我们有 <code class="language-plaintext highlighter-rouge">16*20*28 / 2*2 = 2,240</code> 个主机。对于TPU v5p，每个TPU有两个TensorCore，所以我们有 <code class="language-plaintext highlighter-rouge">8960 * 2 = 17,920</code> 个核心。总FLOPs/s是 <code class="language-plaintext highlighter-rouge">8960 * 4.5e14 = 4e18</code> bfloat16。每个芯片有96GB的HBM，所以总内存是 <code class="language-plaintext highlighter-rouge">8960 * 96 = 860TB</code>。</p> </details> <p><strong>问题3 [PCIe操作强度]：</strong>想象我们被迫将一个大的权重矩阵 <d-math>A</d-math>（类型为 <d-math>\text{bfloat16}[D, F]</d-math>）和一批激活 <d-math>x</d-math>（类型为 <d-math>\text{bfloat16}[B, D]</d-math>）存储在主机DRAM中，并想在它们上面进行矩阵乘法。这在单个主机上运行，我们使用一个与之相连的TPU v6e芯片。你可以假设 <d-math>B \ll D</d-math>，和 <d-math>F = 4D</d-math>（在未来的章节中，我们会看到为什么这些是合理的假设）。我们需要多大的最小批量大小 <d-math>B</d-math> 才能在PCIe上保持计算限制？假设PCIe带宽为1.5e10字节/秒。</p> <details><summary>点击此处查看答案。</summary> <p><strong>答案：</strong>我们需要执行 <d-math>2BDF</d-math> 次浮点运算，每个芯片每秒可以执行 <code class="language-plaintext highlighter-rouge">9.2e14</code> 次浮点运算。这需要 <d-math>2BDF / 9.2e14</d-math> 秒来完成。我们需要从DRAM加载 <d-math>2DF + 2BD</d-math> 字节，并将 <d-math>2BF</d-math> 字节写回。我们受限于PCIe传输速度，所以需要 <d-math>2 \cdot (BD + DF + BF) / 1.5e10</d-math> 秒来与TPU进行数据传输。因为我们希望计算时间比权重加载时间长，假设我们可以将所有权重加载与计算重叠，我们希望 <d-math>2BDF / 9.2e14 &gt; 2 \cdot (BD + DF + BF) / 1.5e10</d-math>。我们可以使用我们的假设 <d-math>B \ll D</d-math>，和 <d-math>F = 4D</d-math> 来简化这个不等式，得到</p> <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="0" display="true" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX" display="true" style="margin-left: 0px; margin-right: 0px;"><mjx-mfrac><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c38"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-msup><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: 0.363em;"><mjx-mn class="mjx-n" size="s"><mjx-c class="mjx-c32"></mjx-c></mjx-mn></mjx-script></mjx-msup></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c39"></mjx-c><mjx-c class="mjx-c2E"></mjx-c><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D452 TEX-I"></mjx-c></mjx-mi><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c34"></mjx-c></mjx-mn></mjx-mrow></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3E"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c38"></mjx-c></mjx-mn><mjx-msup><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: 0.363em;"><mjx-mn class="mjx-n" size="s"><mjx-c class="mjx-c32"></mjx-c></mjx-mn></mjx-script></mjx-msup></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c2E"></mjx-c><mjx-c class="mjx-c35"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D452 TEX-I"></mjx-c></mjx-mi><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c30"></mjx-c></mjx-mn></mjx-mrow></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac></mjx-math><mjx-assistive-mml display="block" unselectable="on"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mfrac><mrow><mn>8</mn><mi>B</mi><msup><mi>D</mi><mn>2</mn></msup></mrow><mrow><mn>9.2</mn><mi>e</mi><mn>14</mn></mrow></mfrac><mo>&gt;</mo><mfrac><mrow><mn>8</mn><msup><mi>D</mi><mn>2</mn></msup></mrow><mrow><mn>1.5</mn><mi>e</mi><mn>10</mn></mrow></mfrac></math></mjx-assistive-mml></mjx-container> <p>或者</p> <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="1" display="true" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX" display="true" style="margin-left: 0px; margin-right: 0px;"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3E"></mjx-c></mjx-mo><mjx-mfrac space="4"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c39"></mjx-c><mjx-c class="mjx-c2E"></mjx-c><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D452 TEX-I"></mjx-c></mjx-mi><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c34"></mjx-c></mjx-mn></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c2E"></mjx-c><mjx-c class="mjx-c35"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D452 TEX-I"></mjx-c></mjx-mi><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c30"></mjx-c></mjx-mn></mjx-mrow></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c2243"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="4"><mjx-c class="mjx-c36"></mjx-c><mjx-c class="mjx-c31"></mjx-c></mjx-mn><mjx-mo class="mjx-n"><mjx-c class="mjx-c2C"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="2"><mjx-c class="mjx-c30"></mjx-c><mjx-c class="mjx-c30"></mjx-c><mjx-c class="mjx-c30"></mjx-c></mjx-mn></mjx-math><mjx-assistive-mml display="block" unselectable="on"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mi>B</mi><mo>&gt;</mo><mfrac><mrow><mn>9.2</mn><mi>e</mi><mn>14</mn></mrow><mrow><mn>1.5</mn><mi>e</mi><mn>10</mn></mrow></mfrac><mo>≃</mo><mn>61</mn><mo>,</mo><mn>000</mn></math></mjx-assistive-mml></mjx-container> </details> <p><strong>问题4 [通用矩阵乘法延迟]：</strong>假设我们想将一个权重矩阵int8[16384, 4096]与一个大小为int8[B, 4096]的激活矩阵相乘，其中B是某个未知的批量大小。假设我们开始时在一个TPUv5e上。</p> <ol> <li>这次乘法作为B的函数将耗时多久？<em>提示：计算从HBM加载数组所需的时间和实际乘法所需的时间可能会有帮助。哪个是你的瓶颈？</em> </li> <li>如果我们想从VMEM中运行这个操作呢？作为B的函数它将耗时多久？</li> </ol> <details><summary>点击此处查看答案。</summary> <p><strong>答案：</strong>(1) 我们需要执行的浮点运算次数是 <d-math>2 \cdot 4096 \cdot 16384 \cdot B = 1.3e8 \cdot B</d-math>。所以 <d-math>T_{\text{math}} = (1.3e8 \cdot B) / 3.94e14</d-math> 秒。我们需要从HBM加载 <d-math>16384 \cdot 4096 + 4096 \cdot B</d-math> 字节到VMEM，并将 <d-math>16384 \cdot B</d-math> 字节从VMEM写回HBM。这意味着 <d-math>T_{\text{comms}} = (6.7e7 + 2e4\cdot B) / 8.1e11</d-math> 秒。假设通信和计算尽可能重叠，整个乘法将大约耗时</p> <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="2" display="true" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX" display="true" style="margin-left: 0px; margin-right: 0px;"><mjx-mo class="mjx-n"><mjx-c class="mjx-c6D"></mjx-c><mjx-c class="mjx-c61"></mjx-c><mjx-c class="mjx-c78"></mjx-c></mjx-mo><mjx-mo class="mjx-n"><mjx-c class="mjx-c7B"></mjx-c></mjx-mo><mjx-msub><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-texatom size="s" texclass="ORD"><mjx-mtext class="mjx-n"><mjx-c class="mjx-c6D"></mjx-c><mjx-c class="mjx-c61"></mjx-c><mjx-c class="mjx-c74"></mjx-c><mjx-c class="mjx-c68"></mjx-c></mjx-mtext></mjx-texatom></mjx-script></mjx-msub><mjx-mo class="mjx-n"><mjx-c class="mjx-c2C"></mjx-c></mjx-mo><mjx-msub space="2"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D447 TEX-I"></mjx-c></mjx-mi><mjx-script style="vertical-align: -0.15em; margin-left: -0.12em;"><mjx-texatom size="s" texclass="ORD"><mjx-mtext class="mjx-n"><mjx-c class="mjx-c63"></mjx-c><mjx-c class="mjx-c6F"></mjx-c><mjx-c class="mjx-c6D"></mjx-c><mjx-c class="mjx-c6D"></mjx-c><mjx-c class="mjx-c73"></mjx-c></mjx-mtext></mjx-texatom></mjx-script></mjx-msub><mjx-mo class="mjx-n"><mjx-c class="mjx-c7D"></mjx-c></mjx-mo><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c6D"></mjx-c><mjx-c class="mjx-c61"></mjx-c><mjx-c class="mjx-c78"></mjx-c></mjx-mo><mjx-mrow space="2"><mjx-mo class="mjx-s3"><mjx-c class="mjx-c7B TEX-S3"></mjx-c></mjx-mo><mjx-mfrac><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c36"></mjx-c><mjx-c class="mjx-c2E"></mjx-c><mjx-c class="mjx-c37"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D452 TEX-I"></mjx-c></mjx-mi><mjx-mn class="mjx-n"><mjx-c class="mjx-c37"></mjx-c></mjx-mn><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c2B"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="3"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D452 TEX-I"></mjx-c></mjx-mi><mjx-mn class="mjx-n"><mjx-c class="mjx-c34"></mjx-c></mjx-mn><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c22C5"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="3"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c38"></mjx-c><mjx-c class="mjx-c2E"></mjx-c><mjx-c class="mjx-c31"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D452 TEX-I"></mjx-c></mjx-mi><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c31"></mjx-c></mjx-mn></mjx-mrow></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-mo class="mjx-n"><mjx-c class="mjx-c2C"></mjx-c></mjx-mo><mjx-mfrac space="2"><mjx-frac type="d"><mjx-num><mjx-nstrut type="d"></mjx-nstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c2E"></mjx-c><mjx-c class="mjx-c33"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D452 TEX-I"></mjx-c></mjx-mi><mjx-mn class="mjx-n"><mjx-c class="mjx-c38"></mjx-c></mjx-mn><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c22C5"></mjx-c></mjx-mo><mjx-mi class="mjx-i" space="3"><mjx-c class="mjx-c1D435 TEX-I"></mjx-c></mjx-mi></mjx-mrow></mjx-num><mjx-dbox><mjx-dtable><mjx-line type="d"></mjx-line><mjx-row><mjx-den><mjx-dstrut type="d"></mjx-dstrut><mjx-mrow><mjx-mn class="mjx-n"><mjx-c class="mjx-c33"></mjx-c><mjx-c class="mjx-c2E"></mjx-c><mjx-c class="mjx-c39"></mjx-c><mjx-c class="mjx-c34"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D452 TEX-I"></mjx-c></mjx-mi><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c34"></mjx-c></mjx-mn></mjx-mrow></mjx-den></mjx-row></mjx-dtable></mjx-dbox></mjx-frac></mjx-mfrac><mjx-mo class="mjx-s3"><mjx-c class="mjx-c7D TEX-S3"></mjx-c></mjx-mo></mjx-mrow></mjx-math><mjx-assistive-mml display="block" unselectable="on"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mo data-mjx-texclass="OP" movablelimits="true">max</mo><mo fence="false" stretchy="false">{</mo><msub><mi>T</mi><mrow data-mjx-texclass="ORD"><mtext>math</mtext></mrow></msub><mo>,</mo><msub><mi>T</mi><mrow data-mjx-texclass="ORD"><mtext>comms</mtext></mrow></msub><mo fence="false" stretchy="false">}</mo><mo>=</mo><mo data-mjx-texclass="OP" movablelimits="true">max</mo><mrow data-mjx-texclass="INNER"><mo data-mjx-texclass="OPEN">{</mo><mfrac><mrow><mn>6.7</mn><mi>e</mi><mn>7</mn><mo>+</mo><mn>2</mn><mi>e</mi><mn>4</mn><mo>⋅</mo><mi>B</mi></mrow><mrow><mn>8.1</mn><mi>e</mi><mn>11</mn></mrow></mfrac><mo>,</mo><mfrac><mrow><mn>1.3</mn><mi>e</mi><mn>8</mn><mo>⋅</mo><mi>B</mi></mrow><mrow><mn>3.94</mn><mi>e</mi><mn>14</mn></mrow></mfrac><mo data-mjx-texclass="CLOSE">}</mo></mrow></math></mjx-assistive-mml></mjx-container> <p>当 <d-math>\frac{6.7e7 + 2e4\cdot B}{8.1e11} &lt; \frac{1.3e8 \cdot B}{3.94e14}</d-math> 时，我们将受限于FLOPs，或者等价地，<d-math>B &gt; 271</d-math>。这个数字比我们下面推导出的240略大，因为我们考虑了 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="3" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D437 TEX-I"></mjx-c></mjx-mi></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>D</mi></math></mjx-assistive-mml></mjx-container> 和 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="4" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D439 TEX-I"></mjx-c></mjx-mi></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>F</mi></math></mjx-assistive-mml></mjx-container> 的全部影响。</p> <p>(2) 如果我们改为从VMEM加载，让我们将VMEM到MXU的带宽视为HBM <d-math>\leftrightarrow</d-math> VMEM带宽的22倍。这将我们的数据加载分母从8.1e11变为1.78e13，我们得到 <d-math>B &gt; 11</d-math>。注意，实际上，我们不能将所有VMEM带宽都用于加载 <d-math>W</d-math>，所以实际上它会接近20。</p> </details> <p><strong>问题5 [ICI带宽]：</strong>假设我们有一个TPU v5e <code class="language-plaintext highlighter-rouge">4x4</code> slice。我们想将一个类型为 <code class="language-plaintext highlighter-rouge">bfloat16[8, 128, 8192]</code> 的数组从 <code class="language-plaintext highlighter-rouge">TPU{0,0}</code> 发送到 <code class="language-plaintext highlighter-rouge">TPU{3, 3}</code>。假设TPU v5e的每跳延迟是 <d-math>1\mu s</d-math>。</p> <ol> <li>第一个字节将多快到达目的地？</li> <li>总传输将耗时多久？</li> </ol> <details><summary>点击此处查看答案。</summary> <p><strong>答案：</strong>在TPUv5e中，我们有2D连接。因为我们只有一个 <code class="language-plaintext highlighter-rouge">4x4</code> slice（没有大小为16的轴），我们没有环绕连接。因此，我们的目标芯片可以从两个端口接收数据，同样地，我们的源芯片可以从两个端口发送数据。我们需要传输的数据量是 <code class="language-plaintext highlighter-rouge">2 * 8 * 128 * 8192 = 1.7e7</code> 字节。我们可以同时从两个端口传输（即一半数组向右发送，一半向下发送），所以我们每秒传输 <code class="language-plaintext highlighter-rouge">2 * 4.5e10 = 9e10</code> 字节，这意味着传输整个数组大约需要 <code class="language-plaintext highlighter-rouge">1.7e7 / 9e10 = 188us</code>（假设我们受限于带宽）。在一个 <code class="language-plaintext highlighter-rouge">4x4</code> slice中，芯片 <d-math>(0, 0)</d-math> 和 <d-math>(3, 3)</d-math> 之间有六次跳跃，因为轴上少于16个芯片时没有环绕链路。由于每跳的延迟大约是 <d-math>1\mu s</d-math>，第一个字节将在大约<code class="language-plaintext highlighter-rouge">6us</code>到达，总传输将耗时<code class="language-plaintext highlighter-rouge">188us</code>。</p> </details> <p><strong>问题6 [综合练习，较难]：</strong>想象你有一个大矩阵 <strong>A</strong>：<code class="language-plaintext highlighter-rouge">int8[128 * 1024, 128 * 1024]</code> 均匀分片在一个TPU v5e 4x4 slice上，但卸载到每个芯片的主机DRAM中。假设你想将整个数组复制到TPU{0, 0}并将其与一个向量 <code class="language-plaintext highlighter-rouge">bf16[8, 128 * 1024]</code> 相乘。这将耗时多久？<em>提示：使用上面的数字。</em></p> <details><summary>点击此处查看答案。</summary> <p><strong>答案：</strong>让我们首先概述一下我们需要执行的操作。我们的数组大约是16GB。从上表中，一个TPU v5e主机有4x2的拓扑，所以一个4x4有2个主机。因此，由于我们的数组是均匀分片的，每个主机实际上包含数组的1/2，即8GB。我们需要将这些块全部复制到TPU{0,0}，这给了我们两个选择：</p> <ol> <li>我们可以通过DCN复制，然后通过PCIe将整个未分片的数组加载到HBM中。</li> <li>我们可以将分片的数组加载到它们对应的TPU上，然后在ICI上执行一次gather操作，最后在TPU{0,0}上执行矩阵乘法。</li> </ol> <p>很明显，选项（2）更好。DCN比ICI慢，而且我们更愿意通过多个PCIe链路加载一个大数组，而不是仅仅通过少数几个（主机0上的8个）。这是系统部分示意图。如上所述，请注意TPU通过ICI连接到它们的邻居（即使跨主机），所有TPU都通过PCIe连接到它们的主机CPU，而主机之间通过DCN连接。</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/challenge-problem-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/challenge-problem-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/challenge-problem-1400.webp 1400w" type="image/webp"/> <img class="img-fluid img-small" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/challenge-problem.png" width="100%"/> </picture> <figcaption class="caption">每个芯片实际上都有自己的PCIe链路连接到其主机，但为了清晰起见，这里只显示了一个。</figcaption> </figure> <p>现在让我们计算每个部分将耗时多久：</p> <ol> <li> <p><strong>PCIe加载</strong>：我们通过16个PCIe链路加载16GB / 2 = 8GB的块，每个链路的带宽为 <code class="language-plaintext highlighter-rouge">1.5e10</code> 字节/秒。因此，这将耗时约33毫秒。</p> </li> <li> <p><strong>ICI复制：</strong>每个TPU现在拥有我们数组的16GB / 16 = 1GB。我们的ICI带宽是每个链路<em>双向</em>9e10字节/秒，你会从上图中注意到，在这个拓扑中，TPU v5e上4个ICI链路中只有2个被TPU{0,0}使用。由于TPU{0,0}需要沿着2个轴以 <code class="language-plaintext highlighter-rouge">4.5e10</code> 字节/秒/链路的速度接收总共15GB的数据，我们可以将时间下界限定为 <code class="language-plaintext highlighter-rouge">15e9 / (4.5e10 * 2) = 167ms</code>。实际上，这可能无法实现，因为负载非常不均匀，但可能在2倍的因子内。正如你将在第2节中看到的，执行一个完整的AllGather也大约需要 <code class="language-plaintext highlighter-rouge">16e9 / (4.5e10 * 2)</code>，所以这接近最优。</p> </li> <li> <p><strong>HBM <d-math>\rightarrow</d-math> MXU加载：</strong>为了执行我们最后的矩阵乘法，我们需要将这16e9字节加上bf16[8, 128 * 1024]数组（另外2MB，可忽略不计）通过HBM带宽加载到MXU中，这将耗时 <code class="language-plaintext highlighter-rouge">16e9 / 8.1e11 = 19ms</code>。</p> </li> <li> <p><strong>FLOPs：</strong>我们总共执行 <mjx-container class="MathJax CtxtMenu_Attached_0" ctxtmenu_counter="5" jax="CHTML" style="font-size: 116.9%; position: relative;" tabindex="0"><mjx-math aria-hidden="true" class="MJX-TEX"><mjx-mn class="mjx-n"><mjx-c class="mjx-c32"></mjx-c></mjx-mn><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c22C5"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="3"><mjx-c class="mjx-c38"></mjx-c></mjx-mn><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c22C5"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="3"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c32"></mjx-c><mjx-c class="mjx-c38"></mjx-c></mjx-mn><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c22C5"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="3"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c30"></mjx-c><mjx-c class="mjx-c32"></mjx-c><mjx-c class="mjx-c34"></mjx-c></mjx-mn><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c22C5"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="3"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c32"></mjx-c><mjx-c class="mjx-c38"></mjx-c></mjx-mn><mjx-mo class="mjx-n" space="3"><mjx-c class="mjx-c22C5"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="3"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c30"></mjx-c><mjx-c class="mjx-c32"></mjx-c><mjx-c class="mjx-c34"></mjx-c></mjx-mn><mjx-mo class="mjx-n" space="4"><mjx-c class="mjx-c3D"></mjx-c></mjx-mo><mjx-mn class="mjx-n" space="4"><mjx-c class="mjx-c32"></mjx-c><mjx-c class="mjx-c2E"></mjx-c><mjx-c class="mjx-c37"></mjx-c></mjx-mn><mjx-mi class="mjx-i"><mjx-c class="mjx-c1D452 TEX-I"></mjx-c></mjx-mi><mjx-mn class="mjx-n"><mjx-c class="mjx-c31"></mjx-c><mjx-c class="mjx-c31"></mjx-c></mjx-mn></mjx-math><mjx-assistive-mml display="inline" unselectable="on"><math xmlns="http://www.w3.org/1998/Math/MathML"><mn>2</mn><mo>⋅</mo><mn>8</mn><mo>⋅</mo><mn>128</mn><mo>⋅</mo><mn>1024</mn><mo>⋅</mo><mn>128</mn><mo>⋅</mo><mn>1024</mn><mo>=</mo><mn>2.7</mn><mi>e</mi><mn>11</mn></math></mjx-assistive-mml></mjx-container> FLOPs，由于我们可以执行 <code class="language-plaintext highlighter-rouge">1.97e14</code> bf16 FLOPs/s，我们得到1.3毫秒。</p> </li> </ol> <p>总时间的上限是所有这些时间的总和，但由于TPU通常可以重叠这些操作，我们可以将其视为一个由最慢部分决定的流水线问题。如果这是真的，那么答案大约是150-200毫秒。</p> </details> <h3 class="next-section">第2部分到此结束！关于第3部分，涵盖分区和跨TPU通信，请<a href="sharding.html">点击这里</a>。</h3> <h2 id="appendix">附录</h2> <h3 id="appendix-a-more-on-tpu-internals">附录A：更多关于TPU内部的细节</h3> <p>在这里，我们将更深入地探讨TPU的内部操作。除非另有说明，我们将提供TPU v5p的规格。</p> <h3 id="vpu">VPU</h3> <p>VPU是TPU的向量算术核心。VPU由一个二维SIMD向量机（<strong>VPU</strong>）组成，该向量机执行逐元素算术运算，如vadd（向量加法）或vmax（逐元素最大值），以及一组称为<strong>VREGs</strong>的向量寄存器，用于为VPU和MXU保存数据。</p> <p><strong>VREGs：</strong>每个TPU v5p核心有64个32位VREGs（TPU v4为32个），这给了我们每个核心总共约 <code class="language-plaintext highlighter-rouge">64 * 8 * 128 * 4 = 256kB</code> 的VREG内存（对于整个芯片来说是这个值的2倍，因为我们有两个核心）。一个TPU v5p每个周期可以从VMEM加载3个寄存器，并向VMEM写入1个寄存器。</p> <p><strong>VPU：</strong>VPU是一个形状为 <code class="language-plaintext highlighter-rouge">(8, 128)</code> 的二维向量算术单元，其中128维被称为lane轴，8维被称为sublane轴。在v5上，每个（lane, sublane）对包含4个相互独立的标准浮点ALU。VPU在其每个ALU中用一个周期执行大多数算术指令（如vadd或向量加法），延迟为2个周期，所以例如在v5中，你每个周期可以从VREGs中将4对f32值相加。一个典型的VPU指令可能看起来像 <code class="language-plaintext highlighter-rouge">{v2 = vadd.8x128.f32 v0, v1}</code>，其中v0和v1是输入VREGs，v2是输出VREG。</p> <p>所有lane和sublane都以纯粹的SIMD方式每个周期执行相同的程序，但每个ALU可以执行不同的操作。所以我们可以在一个周期内处理1个vadd和1个vsub，每个都作用于两个完整的VREGs并将输出写入第三个。</p> <p><strong>小测验 [计算VPU吞吐量]：</strong>使用以上信息，计算一个TPU v5p可以执行多少向量FLOPs/s。一个TPU v5p的时钟速度约为1.75GHz。</p> <details><summary>点击此处查看答案。</summary> <p><em>答案</em>：每个周期，每个核心可以在 <code class="language-plaintext highlighter-rouge">8 * 128</code> 个ALU上执行4个向量指令。这给了我们整个芯片每个周期 <code class="language-plaintext highlighter-rouge">8 * 128 * 4 * 2</code> FLOPs，或者 <code class="language-plaintext highlighter-rouge">8 * 128 * 4 * 2 * 1.75e9 = 1.4e13 FLOPs/s</code>。注意这比MXU的FLOPs/s（约<code class="language-plaintext highlighter-rouge">2e14</code>）小多少（大约10倍）。</p> </details> <p><strong>归约：</strong>通常，跨sublane维度的通信或归约比跨lane维度的要容易。例如，VPU支持一个lane内shuffle操作，可以在大小为8的轴上大约一个周期内滚动。这可以用来在sublane维度上执行高效的归约（只需按4、2和1进行shuffle，并进行3对逐元素求和）。</p> <p>跨lane归约要困难得多，并且涉及一个称为XLU或“跨lane单元”的独立硬件单元，它又慢又相当昂贵。</p> <p><strong>与GPU的比较：</strong>对于熟悉NVIDIA GPU的人来说，VPU中的每个ALU类似于一个CUDA核心，而一个VPU lane类似于一个“Warp Scheduler”，即通常执行SIMD算术的32个CUDA核心的集合。在lane内的归约相当容易，但如果我们需要跨lane，我们至少需要通过VMEM/XLU/SMEM，这要慢得多。更多细节请参见<a href="gpus.html">GPU部分</a>。</p> <h3 id="scalar-core">标量核心</h3> <p>标量核心是TPU的控制单元。它获取并分派所有指令，执行从HBM到VMEM的传输，并且可以编程来做标量元数据工作。由于标量核心是单线程的，这带来的一个副作用是TPU的每个核心每个周期只能创建一个DMA请求。</p> <p>具体来说，一个标量核心控制着一个VPU（由4096个ALU组成）、4个MXU、2个XLU和多个DMA引擎。这种每个计算单元控制的高度倾斜特性是硬件效率的来源，但也限制了以任何有趣的方式进行数据依赖向量化的能力。</p> <h3 id="appendix-b-how-does-a-systolic-array-work">附录B：脉动阵列是如何工作的？</h3> <p>TPU MXU的核心是一个 <code class="language-plaintext highlighter-rouge">128x128</code> 脉动阵列（TPU v6e上为 <code class="language-plaintext highlighter-rouge">256x256</code>）。当完全饱和时，脉动阵列可以每8个时钟周期执行一次 <code class="language-plaintext highlighter-rouge">bfloat16[8,128] @ bf16[128x128] -&gt; f32[8,128]</code><d-footnote id="d-footnote-10">如果你不熟悉这种表示法，它的意思是：将一个`8x128`的bfloat16元素矩阵与一个`128x128`的bfloat16元素矩阵相乘，并将结果存储在一个`8x128`的float32元素矩阵中。</d-footnote> 乘法。</p> <ul> <li>在其核心，脉动阵列是一个二维 <code class="language-plaintext highlighter-rouge">128x128</code> (<code class="language-plaintext highlighter-rouge">=16,384</code>) 的ALU网格，每个ALU都能执行乘法和加法操作。</li> <li>权重（<strong>W</strong>，即 <code class="language-plaintext highlighter-rouge">128x128</code> 输入）从上方（称为RHS）传入，而输入（<strong>X</strong>，即 <code class="language-plaintext highlighter-rouge">8x128</code> 输入）从左侧（称为LHS）传入。</li> </ul> <p>这是一个将一组权重（蓝色）与一组激活（绿色）相乘的简化动画。你会注意到权重（RHS）首先被部分加载，呈对角线状，然后激活也被对角线地送入。在下面的每一帧中，我们将所有重叠的绿色和蓝色单元相乘，将结果与从上方传入的任何残差相加，然后将结果依次向下一个单元传递。</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/systolic-array-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/systolic-array-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/systolic-array-1400.webp 1400w" type="image/webp"/> <img height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/systolic-array.gif" width="100%"/> </picture> </figure> <p>这是一个更通用的版本动画，展示了输出如何从计算中流出：</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/systolic-array2-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/systolic-array2-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/systolic-array2-1400.webp 1400w" type="image/webp"/> <img class="img-small" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/systolic-array2.gif" width="100%"/> </picture> </figure> <p>这是一个展示了如何在多个RHS和LHS数组之间进行流水线操作的图表：</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/systolic-array-pipelining-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/systolic-array-pipelining-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/systolic-array-pipelining-1400.webp 1400w" type="image/webp"/> <img class="img-fluid" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/systolic-array-pipelining.png" width="100%"/> </picture> </figure> <p>在加载权重（RHS）和激活（LHS）时存在一个初始的流水线气泡。在那个初始气泡之后，可以加载新的输入和权重而无需额外的气泡。</p> <p>这是一个bf16[2, 3] x bf16[3, 3]矩阵乘法的拙劣动画，你可以把它想象成一个2x3的权重矩阵与一个批量为1、大小为3的输入激活的矩阵乘法。这个动画与前面的幻灯片相比是旋转的，输入向右流出而不是向下，但你大致可以看到结构。</p> <figure> <picture> <source class="responsive-img-srcset" sizes="95vw" srcset="https://jax-ml.github.io/scaling-book/assets/img/systolic-array-bad-480.webp 480w, https://jax-ml.github.io/scaling-book/assets/img/systolic-array-bad-800.webp 800w, https://jax-ml.github.io/scaling-book/assets/img/systolic-array-bad-1400.webp 1400w" type="image/webp"/> <img class="img-small" height="auto" loading="lazy" onerror="this.onerror=null; $('.responsive-img-srcset').remove();" src="https://jax-ml.github.io/scaling-book/assets/img/systolic-array-bad.gif" width="100%"/> </picture> </figure> <p>我们可以高效地对此进行流水线操作，以乘法大型矩阵而不会产生过大的流水线气泡。话虽如此，重要的是我们的矩阵形状要大于MXU的边长，通常是128x128。一些TPU（自TPU v3起）有多个MXU，TPU v3有2个，TPU v4/5有4个，所以我们需要确保分块维度大于128 * MXU的数量。<a href="https://www.youtube.com/watch?v=sJltBQ4MOHA" rel="external nofollow noopener" target="_blank">这里</a>有一个很好的动画。</p> <p>Trillium（TPU v6e）有一个 <code class="language-plaintext highlighter-rouge">256x256</code> 脉动阵列，这意味着它每周期可以执行4倍的FLOPs。这也意味着你的张量维度需要是原来的两倍大才能充分利用MXU。</p> <p><a href="https://fleetwood.dev/posts/domain-specific-architectures#google-tpu" rel="external nofollow noopener" target="_blank">这篇博客文章</a>有另一个关于固定权重矩阵的脉动阵列乘法的极佳动画。</p> </d-article> <d-appendix>
+<style>
+
+d-appendix {
+  contain: layout style;
+  font-size: 0.8em;
+  line-height: 1.7em;
+  margin-top: 60px;
+  margin-bottom: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  color: rgba(0,0,0,0.5);
+  padding-top: 60px;
+  padding-bottom: 48px;
+}
+
+d-appendix h3 {
+  grid-column: page-start / text-start;
+  font-size: 15px;
+  font-weight: 500;
+  margin-top: 1em;
+  margin-bottom: 0;
+  color: rgba(0,0,0,0.65);
+}
+
+d-appendix h3 + * {
+  margin-top: 1em;
+}
+
+d-appendix ol {
+  padding: 0 0 0 15px;
+}
+
+@media (min-width: 768px) {
+  d-appendix ol {
+    padding: 0 0 0 30px;
+    margin-left: -30px;
+  }
+}
+
+d-appendix li {
+  margin-bottom: 1em;
+}
+
+d-appendix a {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+d-appendix > * {
+  grid-column: text;
+}
+
+d-appendix > d-footnote-list,
+d-appendix > d-citation-list,
+d-appendix > distill-appendix {
+  grid-column: screen;
+}
+
+</style>
+<d-footnote-list style="">
+<style>
+
+d-footnote-list {
+  contain: layout style;
+}
+
+d-footnote-list > * {
+  grid-column: text;
+}
+
+d-footnote-list a.footnote-backlink {
+  color: rgba(0,0,0,0.3);
+  padding-left: 0.5em;
+}
+
+</style>
+<h3>脚注</h3>
+<ol><li id="d-footnote-1-listing">TPU v6e (Trillium) 有一个256x256的MXU，而之前所有代际都使用128x128<a class="footnote-backlink" href="#d-footnote-1">[↩]</a></li><li id="d-footnote-2-listing">TPU，特别是其脉动阵列，之所以是如此强大的硬件加速器，是因为矩阵乘法是少数几个使用 <d-math>O(n^3)</d-math> 计算量处理 <d-math>O(n^2)</d-math> 字节数据的算法之一。这使得普通的ALU很容易受计算而非内存带宽的限制。<a class="footnote-backlink" href="#d-footnote-2">[↩]</a></li><li id="d-footnote-3-listing">我们有时会谈到VMEM预取，指的是提前在VMEM中加载权重，这样我们就可以掩盖矩阵乘法的加载成本。例如，在标准的Transformer中，我们有时可以在注意力计算期间将大的前馈网络权重加载到VMEM中，如果我们的内存带宽受限，这可以隐藏权重加载的成本。这要求我们的权重足够小或分片得足够细，以便能将单层权重放入VMEM并留有余地。<a class="footnote-backlink" href="#d-footnote-3">[↩]</a></li><li id="d-footnote-4-listing">在Cloud TPU VM上，每个托盘都作为独立VM的一部分暴露出来，因此再次可见4个核心。<a class="footnote-backlink" href="#d-footnote-4">[↩]</a></li><li id="d-footnote-5-listing">光学开关只是一个具有相同ICI带宽的可重构连接。它只是让我们在连接立方体的同时保留环绕链路。<a class="footnote-backlink" href="#d-footnote-5">[↩]</a></li><li id="d-footnote-6-listing">请注意，一个 `2x2x4` 不会有任何环绕连接，因为它们是由光开关提供的，而光开关只在完整的立方体上可用。然而，一个TPU v5e 8x16 _将_在较长的轴上有环绕连接，因为它不使用可重构的光网络。<a class="footnote-backlink" href="#d-footnote-6">[↩]</a></li><li id="d-footnote-7-listing">上述页面列出的带宽为100 GB/s，与此处列出的略有不同。TPU ICI链路的带宽根据执行的操作略有不同。你通常可以放心使用本文档中的数字。<a class="footnote-backlink" href="#d-footnote-7">[↩]</a></li><li id="d-footnote-8-listing">TPU v6e为12.5e9字节/秒，v5e为3.125e9字节/秒。<a class="footnote-backlink" href="#d-footnote-8">[↩]</a></li><li id="d-footnote-9-listing">我们所说的双向（bidi）带宽是指单个链路上双向可发送的总字节数，或者等同于，假设我们可以高效地使用两个链路，单个TPU沿特定轴的总出向字节数。当我们有一个功能正常的环形网络时，即当我们在特定轴上有环绕连接时，这是成立的。这在推理芯片上当我们有一个完整的16轴时发生，或者在训练芯片（v*p）上当我们有一个是4的倍数的轴时发生。我们更喜欢使用双向带宽，因为它在涉及双向通信的计算中频繁出现。<a class="footnote-backlink" href="#d-footnote-9">[↩]</a></li><li id="d-footnote-10-listing">如果你不熟悉这种表示法，它的意思是：将一个`8x128`的bfloat16元素矩阵与一个`128x128`的bfloat16元素矩阵相乘，并将结果存储在一个`8x128`的float32元素矩阵中。<a class="footnote-backlink" href="#d-footnote-10">[↩]</a></li></ol>
+</d-footnote-list> <d-citation-list style=""><style>
+d-citation-list {
+  contain: style;
+}
+
+d-citation-list .references {
+  grid-column: text;
+}
+
+d-citation-list .references .title {
+  font-weight: 500;
+}
+</style><h3 id="references">参考文献</h3><ol class="references" id="references-list"><li id="tpu_paper"><span class="title">TPU v4：一种用于机器学习的光学可重构超级计算机，具有对嵌入的硬件支持</span> <br/>Jouppi, N.P., Kurian, G., Li, S., Ma, P., Nagarajan, R., Nai, L., Patil, N., Subramanian, S., Swing, A., Towles, B., Young, C., Zhou, X., Zhou, Z. and Patterson, D., 2023. arXiv [cs.AR]. </li></ol></d-citation-list> <div class="base-grid appendix-entry"> <h3 style="grid-column: 0;">其他</h3> <p class="author-footnote" style="grid-column: text;"><sup>*</sup>工作于Google DeepMind期间完成，现就职于MatX。</p> </div> <div class="base-grid appendix-entry"> <h3 style="grid-column: 0;">引用</h3> <p class="author-footnote">在学术场合引用，请按以下格式引用此作品：</p> <div class="author-footnote"> <div class="language-bibtex highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code>    <span class="c">Austin et al., "How to Scale Your Model", Google DeepMind, online, 2025.</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> </div> <p class="author-footnote">或使用BibTeX条目：</p> <div class="author-footnote"> <div class="language-bibtex highlighter-rouge"><div class="highlight"><div class="code-display-wrapper"><pre class="highlight"><code>    <span class="nc">@article</span><span class="p">{</span><span class="nl">scaling-book</span><span class="p">,</span>
+      <span class="na">title</span> <span class="p">=</span> <span class="s">{How to Scale Your Model}</span><span class="p">,</span>
+      <span class="na">author</span> <span class="p">=</span> <span class="s">{Austin, Jacob and Douglas, Sholto and Frostig, Roy and Levskaya, Anselm and Chen, Charlie and Vikram, Sharad
+      and Lebron, Federico and Choy, Peter and Ramasesh, Vinay and Webson, Albert and Pope, Reiner}</span><span class="p">,</span>
+      <span class="na">publisher</span> <span class="p">=</span> <span class="s">{Google DeepMind}</span><span class="p">,</span>
+      <span class="na">howpublished</span> <span class="p">=</span> <span class="s">{Online}</span><span class="p">,</span>
+      <span class="na">note</span> <span class="p">=</span> <span class="s">{Retrieved from https://jax-ml.github.io/scaling-book/}</span><span class="p">,</span>
+      <span class="na">year</span> <span class="p">=</span> <span class="s">{2025}</span>
+    <span class="p">}</span>
+</code></pre><button aria-label="Copy code to clipboard" class="copy" type="button"><i class="fa-solid fa-clipboard"></i></button></div></div></div> </div> </div> </d-appendix> <d-bibliography src="/scaling-book/assets/bibliography/main.bib"></d-bibliography> <div id="giscus_thread" style="max-width: 930px; margin: 0 auto;"> <script>
+      let giscusTheme = determineComputedTheme();
+      let giscusAttributes = {
+        src: 'https://giscus.app/client.js',
+        'data-repo': 'jax-ml/scaling-book',
+        'data-repo-id': '',
+        'data-category': 'General',
+        'data-category-id': '',
+        'data-mapping': 'title',
+        'data-strict': '0',
+        'data-reactions-enabled': '1',
+        'data-emit-metadata': '0',
+        'data-input-position': 'bottom',
+        'data-theme': giscusTheme,
+        'data-loading': '1',
+        'data-lang': 'en',
+        crossorigin: 'anonymous',
+        async: '',
+      };
+
+      let giscusScript = document.createElement('script');
+      Object.entries(giscusAttributes).forEach(([key, value]) => giscusScript.setAttribute(key, value));
+      document.getElementById('giscus_thread').appendChild(giscusScript);
+    </script><script async="" crossorigin="anonymous" data-category="General" data-category-id="" data-emit-metadata="0" data-input-position="bottom" data-lang="en" data-loading="1" data-mapping="title" data-reactions-enabled="1" data-repo="jax-ml/scaling-book" data-repo-id="" data-strict="0" data-theme="light" src="https://giscus.app/client.js"></script><div class="giscus"><iframe allow="clipboard-write" class="giscus-frame giscus-frame--loading" scrolling="no" src="https://giscus.app/en/widget?origin=https%3A%2F%2Fjax-ml.github.io%2Fscaling-book%2Ftpus%2F&amp;session=&amp;theme=light&amp;reactionsEnabled=1&amp;emitMetadata=0&amp;inputPosition=bottom&amp;repo=jax-ml%2Fscaling-book&amp;repoId=&amp;category=General&amp;categoryId=&amp;strict=0&amp;description=This+section+is+all+about+how+TPUs+work%2C+how+they%27re+networked+together+to+enable+multi-chip+training+and+inference%2C+and+how+this+affects+the+performance+of+our+favorite+algorithms.+There%27s+even+some+good+stuff+for+GPU+users+too%21&amp;backLink=https%3A%2F%2Fjax-ml.github.io%2Fscaling-book%2Ftpus%2F&amp;term=How+to+Think+About+TPUs+%7C+How+To+Scale+Your+Model" style="opacity: 0;" title="Comments"></iframe></div> <noscript>请启用JavaScript以查看由<a href="http://giscus.app/?ref_noscript" rel="external nofollow noopener" target="_blank">giscus</a>支持的评论。 </noscript> </div> </div> <footer class="sticky-bottom mt-5" role="contentinfo"> <div class="container"> © 版权所有 2025。由 <a href="https://jekyllrb.com/" rel="external nofollow noopener" target="_blank">Jekyll</a> 和 <a href="https://github.com/alshedivat/al-folio" rel="external nofollow noopener" target="_blank">al-folio</a> 主题强力驱动。托管于 <a href="https://pages.github.com/" rel="external nofollow noopener" target="_blank">GitHub Pages</a>。 </div> </footer> <script crossorigin="anonymous" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/bootstrap.bundle.min.js"></script> <script crossorigin="anonymous" integrity="sha256-NdbiivsvWt7VYCt6hYNT3h/th9vSTL4EDWeGs5SN3DA=" src="https://cdn.jsdelivr.net/npm/mdbootstrap@4.20.0/js/mdb.min.js"></script> <script crossorigin="anonymous" defer="" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" src="https://cdn.jsdelivr.net/npm/medium-zoom@1.1.0/dist/medium-zoom.min.js"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/zoom.js?85ddb88934d28b74e78031fd54cf8308"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/no_defer.js?2781658a0a2b13ed609542042a859126"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/common.js?e0514a05c5c95ac1a93a8dfd5249b92e"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/copy_code.js?12775fdf7f95e901d7119054556e495f" type="text/javascript"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/jupyter_new_tab.js?d9f17b6adc2311cbabd747f4538bb15f"></script> <script crossorigin="anonymous" defer="" id="MathJax-script" integrity="sha256-MASABpB4tYktI2Oitl4t+78w/lyA+D7b/s9GEP0JOGI=" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-mml-chtml.js" type="text/javascript"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/mathjax-setup.js?70d799092f862ad98c7876aa47712e20"></script> <script crossorigin="anonymous" defer="" src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script> <script defer="" src="https://jax-ml.github.io/scaling-book/assets/js/progress-bar.js?2f30e0e6801ea8f5036fa66e1ab0a71a" type="text/javascript"></script> <script src="https://jax-ml.github.io/scaling-book/assets/js/vanilla-back-to-top.min.js?f40d453793ff4f64e238e420181a1d17"></script> <script>
+    addBackToTop();
+  </script><div class="hidden" id="back-to-top"><svg viewbox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg></div> <div class="hiddendiv common"></div></body>
+</html>

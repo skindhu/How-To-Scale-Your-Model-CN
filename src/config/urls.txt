@@ -1,0 +1,30 @@
+# 系列技术文章翻译 - URL列表配置文件
+# 创建时间：2024-12-19
+#
+# 使用说明：
+# 1. 每行一个URL，程序将按顺序处理
+# 2. 以#开头的行为注释行，将被忽略
+# 3. 空行将被忽略
+# 4. URL应该是完整的HTTP/HTTPS地址
+#
+# 示例URL（JAX团队的《大规模模型扩展》系列文章）：
+
+
+https://jax-ml.github.io/scaling-book/
+https://jax-ml.github.io/scaling-book/roofline/
+https://jax-ml.github.io/scaling-book/tpus/
+https://jax-ml.github.io/scaling-book/sharding/
+https://jax-ml.github.io/scaling-book/transformers/
+https://jax-ml.github.io/scaling-book/training/
+https://jax-ml.github.io/scaling-book/applied-training/
+https://jax-ml.github.io/scaling-book/inference/
+https://jax-ml.github.io/scaling-book/applied-inference/
+https://jax-ml.github.io/scaling-book/profiling/
+https://jax-ml.github.io/scaling-book/jax-stuff/
+https://jax-ml.github.io/scaling-book/conclusion/
+https://jax-ml.github.io/scaling-book/gpus/
+
+# 注意事项：
+# - 确保目标网站允许爬虫访问
+# - 建议在爬取前检查网站的robots.txt
+# - 如果遇到反爬机制，程序会自动处理基本的延时和重试
