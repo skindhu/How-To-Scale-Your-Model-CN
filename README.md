@@ -26,7 +26,7 @@
 **在线阅读**：[《如何扩展你的模型》](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/scaling-book.html)
 
 + [第0部分：如何扩展你的模型全书大纲](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/scaling-book.html)
-+ [第1部分：关于屋顶线模型的一切](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/scaling-book.html)
++ [第1部分：关于屋顶线模型的一切](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/roofline.html)
 + [第2部分：如何理解TPU](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/tpus.html)
 + [第3部分：分片矩阵及其乘法](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/sharding.html)
 + [第4部分：你需要知道的所有Transformer数学知识](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/transformers.html)
