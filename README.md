@@ -25,6 +25,19 @@
 
 **在线阅读**：[《如何扩展你的模型》](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/scaling-book.html)
 
++ [第0部分：如何扩展你的模型全书大纲](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/scaling-book.html)
++ [第1部分：关于屋顶线模型的一切](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/scaling-book.html)
++ [第2部分：如何理解TPU](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/tpus.html)
++ [第3部分：分片矩阵及其乘法](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/sharding.html)
++ [第4部分：你需要知道的所有Transformer数学知识](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/transformers.html)
++ [第5部分：如何为训练并行化Transformer](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/training.html)
++ [第6部分：在 TPU 上训练 LLaMA 3](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/applied-training.html)
++ [第7部分：Transformer 推理全解析](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/inference.html)
++ [第8部分：在 TPU 上服务 LLaMA 3-70B](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/applied-inference.html)
++ [第9部分：如何分析 TPU 程序](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/profiling.html)
++ [第10部分：在 JAX 中为 TPU 编程](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/jax-stuff.html)
++ [第11部分：如何理解 GPU](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/gpus.html)
++ [第12部分：结论与延伸阅读](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/conclusion.html)
 
 ## 🚀 翻译难点：突破长文档翻译瓶颈
 
