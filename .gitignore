@@ -52,3 +52,4 @@ api_keys.txt
 scripts/
 ai-task-config/
 prd.md
+node_modules/
