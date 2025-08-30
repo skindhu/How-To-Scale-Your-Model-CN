@@ -15,7 +15,7 @@
 
 ### 核心内容概览
 
-1. **屋顶线分析**：理解计算、通信和内存限制
+1. **Roofline分析**：理解计算、通信和内存限制
 2. **TPU/GPU深度解析**：硬件架构与性能特性
 3. **Transformer数学详解**：参数计算、FLOPs分析、内存需求
 4. **并行化策略**：训练和推理的不同并行方案
@@ -26,7 +26,7 @@
 **在线阅读**：[《如何扩展你的模型》](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/scaling-book.html)
 
 + [第0部分：如何扩展你的模型全书大纲](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/scaling-book.html)
-+ [第1部分：关于屋顶线模型的一切](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/roofline.html)
++ [第1部分：关于Roofline模型的一切](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/roofline.html)
 + [第2部分：如何理解TPU](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/tpus.html)
 + [第3部分：分片矩阵及其乘法](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/sharding.html)
 + [第4部分：你需要知道的所有Transformer数学知识](https://skindhu.github.io/How-To-Scale-Your-Model-CN/article-trans/transformers.html)
@@ -84,7 +84,7 @@ def _clean_body_for_translation(self, body_content: str) -> str:
 ```python
 self.terminology = {
     "TPU": "TPU",
-    "roofline": "屋顶线",
+    "roofline": "Roofline",
     "sharding": "分片",
     # ... 50+专业术语对照表
 }
